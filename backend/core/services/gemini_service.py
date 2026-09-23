@@ -103,19 +103,19 @@ def gemini_generate(client, prompt):
 
 
 # ---------------------------------------------------------------------------
-# Unified AI call -- Groq first, Gemini as fallback
+# Unified AI call -- Gemini first (better quality), Groq as fallback
 # ---------------------------------------------------------------------------
 def ai_generate(system_prompt, user_prompt):
-    """Tries Groq first, then Gemini. Returns None if both unavailable."""
-    groq_client = get_groq_client()
-    if groq_client:
-        result = groq_generate(groq_client, system_prompt, user_prompt)
-        if result:
-            return result
-
+    """Tries Gemini first, then Groq. Returns None if both unavailable."""
     gemini_client = get_gemini_client()
     if gemini_client:
         result = gemini_generate(gemini_client, f"{system_prompt}\n\n{user_prompt}")
+        if result:
+            return result
+
+    groq_client = get_groq_client()
+    if groq_client:
+        result = groq_generate(groq_client, system_prompt, user_prompt)
         if result:
             return result
 
@@ -166,64 +166,90 @@ def chat_with_gemini(conversation_history: list, current_message: str, vehicle_i
 def analyze_multimodal_media(file_path: str, file_type: str, user_prompt: str = "", vehicle_info: str = "") -> str:
     """
     Inspects image/audio/video files for mechanical faults.
-    Images use Gemini multimodal; Groq handles text fallback.
+    Images: Groq vision (base64) first, Gemini as fallback.
+    Audio/video: Gemini only.
     """
     if not os.path.exists(file_path):
-        return (
-            f"Got your {file_type}. Tell me exactly where on the vehicle this is from "
-            "and I will give you a diagnosis."
-        )
+        return f"Got your {file_type}. Tell me exactly where on the vehicle this is from and I will diagnose it."
 
     if file_type == 'image':
+        vehicle_context = f"Vehicle: {vehicle_info}. " if vehicle_info else ""
+        mechanic_instruction = (
+            f"You are Mac, a senior car mechanic inspecting a vehicle photo. {vehicle_context}"
+            "Look at the image and identify: what component is shown, any visible damage, "
+            "leaks, corrosion, wear, or faults. Give a SHORT 2-3 sentence diagnosis and "
+            "the approximate repair cost in INR (Rs.)."
+        )
+        question = user_prompt or "What is the problem visible in this photo and how much will it cost to fix?"
+
+        # --- Gemini multimodal (primary) ---
         gemini_client = get_gemini_client()
         if gemini_client:
             try:
-                vehicle_context = f"Vehicle: {vehicle_info}\n" if vehicle_info else ""
-                technician_prompt = (
-                    "You are Mac, a senior car mechanic inspecting a photo. "
-                    f"{vehicle_context}"
-                    "Identify the component, describe any damage or fault you see, "
-                    "and give a brief 2-3 sentence diagnosis with cost in INR (Rs.)."
-                )
                 img = Image.open(file_path)
                 for model_name in GEMINI_MODELS:
                     try:
                         model = gemini_client.GenerativeModel(model_name)
-                        response = model.generate_content(
-                            [technician_prompt, img,
-                             user_prompt or "Inspect this vehicle photo and diagnose the issue briefly."]
-                        )
+                        response = model.generate_content([mechanic_instruction, img, question])
                         if response and response.text:
                             return response.text.strip()
                     except Exception as e:
                         logger.warning(f"Gemini multimodal {model_name} failed: {e}")
             except Exception as e:
-                logger.error(f"Image analysis error: {e}", exc_info=True)
+                logger.error(f"Gemini image error: {e}", exc_info=True)
 
-        # Groq text fallback
-        result = ai_generate(
-            "You are a car mechanic. The customer uploaded a photo. Ask them to describe what they see so you can help.",
-            user_prompt or "Customer uploaded a vehicle photo."
-        )
-        if result:
-            return result
+        # --- Groq vision via base64 (fallback) ---
+        groq_client = get_groq_client()
+        if groq_client:
+            try:
+                import base64, io as _io
+                img_pil = Image.open(file_path).convert('RGB')
+                buf = _io.BytesIO()
+                img_pil.save(buf, format='JPEG', quality=75)
+                b64 = base64.b64encode(buf.getvalue()).decode()
+                data_uri = f"data:image/jpeg;base64,{b64}"
+
+                for model_name in GROQ_MODELS:
+                    try:
+                        response = groq_client.chat.completions.create(
+                            model=model_name,
+                            messages=[{
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": f"{mechanic_instruction}\n\n{question}"},
+                                    {"type": "image_url", "image_url": {"url": data_uri}},
+                                ]
+                            }],
+                            temperature=0.3,
+                            max_tokens=300,
+                        )
+                        text = response.choices[0].message.content
+                        if text:
+                            return text.strip()
+                    except Exception as e:
+                        logger.warning(f"Groq vision {model_name} failed: {e}")
+            except Exception as e:
+                logger.error(f"Groq vision error: {e}", exc_info=True)
+
+        return "I received your photo. Could you also describe what you see — for example, where the issue is or what part of the car this is?"
 
     elif file_type in ['audio', 'video']:
+        # Groq does not support audio/video -- use Gemini only
         gemini_client = get_gemini_client()
         if gemini_client:
             try:
-                vehicle_context = f"Vehicle: {vehicle_info}\n" if vehicle_info else ""
-                technician_prompt = (
-                    f"You are Mac, a senior car mechanic analyzing a {file_type}. "
-                    f"{vehicle_context}Diagnose the issue briefly. Use INR (Rs.) for costs."
+                vehicle_context = f"Vehicle: {vehicle_info}. " if vehicle_info else ""
+                prompt = (
+                    f"You are Mac, a senior car mechanic. {vehicle_context}"
+                    f"Analyze this {file_type} and give a brief diagnosis with cost in INR (Rs.)."
                 )
                 uploaded_file = gemini_client.upload_file(path=file_path)
                 for model_name in GEMINI_MODELS:
                     try:
                         model = gemini_client.GenerativeModel(model_name)
                         response = model.generate_content(
-                            [technician_prompt, uploaded_file,
-                             user_prompt or f"Analyze this {file_type} and diagnose the issue."]
+                            [prompt, uploaded_file,
+                             user_prompt or f"Diagnose the issue in this {file_type}."]
                         )
                         if response and response.text:
                             return response.text.strip()
@@ -232,42 +258,57 @@ def analyze_multimodal_media(file_path: str, file_type: str, user_prompt: str = 
             except Exception as e:
                 logger.error(f"Audio/video analysis error: {e}", exc_info=True)
 
-    return (
-        f"Got your {file_type}. Describe what you see or hear and I will diagnose it."
-    )
+    return f"Got your {file_type}. Describe what you see or hear and I will diagnose it."
+
+
 
 
 def synthesize_diagnosis(vehicle_info: str, symptoms: list, messages: list) -> dict:
     """
     Generates a structured repair cost report via AI.
-    Only uses what the customer actually said -- no hardcoded keyword logic.
+    Uses full conversation so image analysis results are included in the report.
     Raises RuntimeError if AI is unavailable.
     """
-    # Only use USER messages -- exclude mechanic replies to avoid contamination
+    # Build full conversation context — include both user messages AND mechanic image
+    # analysis results so the report reflects what was found in any uploaded photos.
+    # We exclude generic mechanic follow-up questions to avoid noise.
     user_messages = [m.get('message', '') for m in messages if m.get('sender') == 'user']
+    mechanic_observations = [
+        m.get('message', '') for m in messages
+        if m.get('sender') == 'mechanic' and len(m.get('message', '')) > 80
+        # Only include longer mechanic messages — these are image analysis results,
+        # not short follow-up questions which are typically < 80 chars
+    ]
     if symptoms:
         user_messages.extend(symptoms)
-    user_context = "\n".join(f"- {m}" for m in user_messages if m.strip())
+
+    context_parts = []
+    if user_messages:
+        context_parts.append("Customer reported:\n" + "\n".join(f"- {m}" for m in user_messages if m.strip()))
+    if mechanic_observations:
+        context_parts.append("Image/media analysis findings:\n" + "\n".join(f"- {m}" for m in mechanic_observations if m.strip()))
+    user_context = "\n\n".join(context_parts)
 
     system_prompt = (
         "You are a senior car mechanic generating a repair cost report. "
-        "Diagnose ONLY what the customer reported. "
-        "Headlight issue = headlight report only. Engine smoke = engine report only. "
+        "The customer may have reported MULTIPLE issues (e.g. headlights AND engine smoke). "
+        "You MUST include ALL reported issues in the report — do not pick just one. "
+        "List every relevant service for every problem mentioned. "
         "Use realistic Indian market repair rates. Write costs as Rs.X,XXX - Rs.Y,YYY. "
         "Reply with ONLY a JSON object. No markdown. No extra text before or after the JSON."
     )
 
     user_prompt = (
         f"Vehicle: {vehicle_info or 'Unknown Vehicle'}\n"
-        f"Customer complaint:\n{user_context}\n\n"
-        "Return ONLY valid JSON (no markdown, no extra text):\n"
-        '{"issue_title": "Short name of the exact issue",'
-        ' "summary": "1-2 sentences about the fault.",'
-        ' "severity": "LOW or MEDIUM or HIGH or CRITICAL",'
-        ' "probable_causes": ["cause 1", "cause 2"],'
-        ' "recommended_services": [{"name": "service name", "estimated_cost": "Rs.X,XXX - Rs.Y,YYY", "urgency": "Immediate or Soon or Routine"}],'
-        ' "safety_warning": "Brief safety note.",'
-        ' "estimated_cost_range": "Rs.X,XXX - Rs.Y,YYY"}'
+        f"All reported issues and findings:\n{user_context}\n\n"
+        "Return ONLY valid JSON covering ALL the issues above (no markdown, no extra text):\n"
+        '{"issue_title": "Combined title covering all reported issues (e.g. Headlight Failure + Engine Smoke)",'
+        ' "summary": "1-2 sentences covering every problem reported.",'
+        ' "severity": "highest severity among all reported issues: LOW or MEDIUM or HIGH or CRITICAL",'
+        ' "probable_causes": ["cause for issue 1", "cause for issue 2", "cause for issue 3"],'
+        ' "recommended_services": [{"name": "service for EVERY reported issue", "estimated_cost": "Rs.X,XXX - Rs.Y,YYY", "urgency": "Immediate or Soon or Routine"}],'
+        ' "safety_warning": "Safety note covering all reported issues.",'
+        ' "estimated_cost_range": "Rs.X,XXX - Rs.Y,YYY (total of all services)"}'
     )
 
     text = ai_generate(system_prompt, user_prompt)

@@ -66,6 +66,7 @@ export default function Home() {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isObdModalOpen, setIsObdModalOpen] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -179,6 +180,7 @@ export default function Home() {
       const activeSession = sessionId || 'new-session';
       const diagnosis = await requestDiagnosis(activeSession);
       setDiagnoses((prev) => [diagnosis, ...prev]);
+      setShowReport(true);
 
       const diagNoticeMsg: ChatMessage = {
         id: `diag-notice-${Date.now()}`,
@@ -444,8 +446,42 @@ export default function Home() {
             })}
 
             {/* In-Chat Diagnosis Report */}
-            {diagnoses.length > 0 && (
-              <div style={{ animation: 'fadeIn 0.35s ease-out' }}>
+            {diagnoses.length > 0 && showReport && (
+              <div style={{ position: 'relative', animation: 'fadeIn 0.35s ease-out' }}>
+                <button
+                  onClick={() => setShowReport(false)}
+                  title="Close Report"
+                  style={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 10,
+                    zIndex: 10,
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    border: '1px solid rgba(239,68,68,0.4)',
+                    color: '#ef4444',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    lineHeight: 1,
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(239,68,68,0.2)';
+                    e.currentTarget.style.borderColor = '#ef4444';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'rgba(15, 23, 42, 0.85)';
+                    e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)';
+                  }}
+                >
+                  ✕
+                </button>
                 <DiagnosisCard
                   diagnosis={diagnoses[0]}
                   onBookClick={handleBookClick}
