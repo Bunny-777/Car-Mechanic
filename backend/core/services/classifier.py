@@ -51,6 +51,72 @@ CAR_MAKES = {
     'skoda', 'renault', 'peugeot', 'suzuki', 'maruti', 'maruti suzuki', 'tata', 'mahindra'
 }
 
+POPULAR_CAR_MODELS = {
+    'swift dzire': ('Maruti Suzuki', 'Swift Dzire'),
+    'dzire': ('Maruti Suzuki', 'Swift Dzire'),
+    'swift': ('Maruti Suzuki', 'Swift'),
+    'baleno': ('Maruti Suzuki', 'Baleno'),
+    'wagonr': ('Maruti Suzuki', 'Wagon R'),
+    'wagon r': ('Maruti Suzuki', 'Wagon R'),
+    'alto': ('Maruti Suzuki', 'Alto'),
+    'brezza': ('Maruti Suzuki', 'Brezza'),
+    'ertiga': ('Maruti Suzuki', 'Ertiga'),
+    'celerio': ('Maruti Suzuki', 'Celerio'),
+    'creta': ('Hyundai', 'Creta'),
+    'i20': ('Hyundai', 'i20'),
+    'i10': ('Hyundai', 'Grand i10'),
+    'verna': ('Hyundai', 'Verna'),
+    'venue': ('Hyundai', 'Venue'),
+    'city': ('Honda', 'City'),
+    'civic': ('Honda', 'Civic'),
+    'amaze': ('Honda', 'Amaze'),
+    'innova': ('Toyota', 'Innova'),
+    'innova crysta': ('Toyota', 'Innova Crysta'),
+    'fortuner': ('Toyota', 'Fortuner'),
+    'glanza': ('Toyota', 'Glanza'),
+    'urban cruiser': ('Toyota', 'Urban Cruiser'),
+    'corolla': ('Toyota', 'Corolla'),
+    'scorpio': ('Mahindra', 'Scorpio'),
+    'thar': ('Mahindra', 'Thar'),
+    'bolero': ('Mahindra', 'Bolero'),
+    'xuv700': ('Mahindra', 'XUV700'),
+    'xuv300': ('Mahindra', 'XUV300'),
+    'nexon': ('Tata', 'Nexon'),
+    'punch': ('Tata', 'Punch'),
+    'harrier': ('Tata', 'Harrier'),
+    'safari': ('Tata', 'Safari'),
+    'tiago': ('Tata', 'Tiago'),
+    'altroz': ('Tata', 'Altroz'),
+    'seltos': ('Kia', 'Seltos'),
+    'sonet': ('Kia', 'Sonet'),
+    'carens': ('Kia', 'Carens'),
+    'polo': ('Volkswagen', 'Polo'),
+    'vento': ('Volkswagen', 'Vento'),
+    'taigun': ('Volkswagen', 'Taigun'),
+    'virtus': ('Volkswagen', 'Virtus'),
+    'slavia': ('Skoda', 'Slavia'),
+    'kushaq': ('Skoda', 'Kushaq'),
+    'octavia': ('Skoda', 'Octavia'),
+    'compass': ('Jeep', 'Compass'),
+    'kwid': ('Renault', 'Kwid'),
+    'triber': ('Renault', 'Triber'),
+    'duster': ('Renault', 'Duster')
+}
+
+MECHANICAL_SYMPTOM_WORDS = {
+    'smoke', 'smoking', 'steam', 'squeal', 'squealing', 'squeak', 'squeaking',
+    'grind', 'grinding', 'knock', 'knocking', 'rattle', 'rattling', 'clunk', 'clunking',
+    'click', 'clicking', 'hiss', 'hissing', 'hum', 'humming', 'whine', 'whining',
+    'vibration', 'shaking', 'shudder', 'wobble', 'pulling', 'overheating', 'overheat',
+    'stall', 'stalling', 'hesitation', 'sluggish', 'misfire', 'misfiring', 'backfire',
+    'leak', 'leaking', 'puddle', 'fluid', 'no crank', 'dead battery', 'jump start',
+    'limp mode', 'rough idle', 'spongy', 'burning', 'smell', 'odor', 'hot', 'boiling',
+    'noise', 'sound', 'light', 'cel', 'dtc', 'broken', 'damage', 'damaged',
+    'fault', 'faulty', 'failed', 'failing', 'stuck', 'jammed', 'cut', 'crack',
+    'issue', 'problem', 'trouble', 'repair', 'replace', 'service', 'maintenance',
+    'tune up', 'slipping', 'jerking', 'warm air', 'cranks', 'cranking'
+}
+
 NON_CAR_TOPICS = [
     r'\b(recipe|cook|bake|ingredient|food|dinner|lunch|pasta|pizza|cake)\b',
     r'\b(python|javascript|react|html|css|sql|coding|programming|algorithm|git)\b',
@@ -75,13 +141,47 @@ def is_greeting(text: str) -> bool:
     return False
 
 
+def has_symptoms(text: str) -> bool:
+    """Check if the text communicates any mechanical problem or automotive symptom."""
+    cleaned = text.lower()
+    tokens = set(re.findall(r'[a-z0-9]+', cleaned))
+    if tokens & MECHANICAL_SYMPTOM_WORDS:
+        return True
+    # Check for OBD-II fault code format (e.g. P0300)
+    if re.search(r'\b[pbcu][0-3][0-9]{3}\b', cleaned):
+        return True
+    # Check for symptom phrases
+    phrases = [
+        "won't start", "wont start", "not starting", "doesn't start", "doesnt start",
+        "hard to start", "check engine", "engine light", "abs light", "burning smell",
+        "sweet smell", "running hot", "losing power", "black smoke", "white smoke",
+        "blue smoke", "oil leak", "coolant leak", "brake noise", "engine noise"
+    ]
+    if any(p in cleaned for p in phrases):
+        return True
+    return False
+
+
+def is_vehicle_only_intro(text: str) -> bool:
+    """
+    Returns True if the user is only naming/introducing their car (e.g., 'i have a swift dzire',
+    'my car is a 2018 honda city', 'swift dzire') without stating any issue or symptom.
+    """
+    cleaned = text.strip().lower()
+    if has_symptoms(cleaned):
+        return False
+    v_details = extract_vehicle_details(cleaned)
+    if v_details.get('make') or v_details.get('model'):
+        return True
+    return False
+
+
 def is_clearly_irrelevant(text: str) -> bool:
     cleaned = text.lower()
     for pattern in NON_CAR_TOPICS:
         if re.search(pattern, cleaned):
-            # Check if there is an explicit car context overriding it
             words = set(re.findall(r'[a-z0-9]+', cleaned))
-            if not (words & AUTOMOTIVE_KEYWORDS or words & CAR_MAKES):
+            if not (words & AUTOMOTIVE_KEYWORDS or words & CAR_MAKES or any(k in cleaned for k in POPULAR_CAR_MODELS)):
                 return True
     return False
 
@@ -90,17 +190,20 @@ def is_automotive(text: str) -> bool:
     cleaned = text.lower()
     tokens = set(re.findall(r'[a-z0-9]+', cleaned))
     
-    # Check direct match with car makes or auto keywords
+    # Check direct match with car makes, models, or auto keywords
     if tokens & AUTOMOTIVE_KEYWORDS:
         return True
     if tokens & CAR_MAKES:
         return True
+    for model_key in POPULAR_CAR_MODELS:
+        if model_key in cleaned:
+            return True
     
     # Check for OBD-II fault code format (e.g. P0300, P0171, B1234, C0040, U0100)
     if re.search(r'\b[pbcu][0-3][0-9]{3}\b', cleaned):
         return True
         
-    # Check for common vehicle phrase structures (e.g., "my 2015 car", "engine light")
+    # Check for common vehicle phrase structures
     if re.search(r'\b(19\d\d|20\d\d)\b', cleaned) and any(w in cleaned for w in ['miles', 'km', 'wheel', 'door', 'hood', 'bonnet', 'trunk', 'boot']):
         return True
 
@@ -116,11 +219,20 @@ def extract_vehicle_details(text: str) -> dict:
     if year_match:
         details['year'] = year_match.group(1)
 
-    # Extract make
-    for make in CAR_MAKES:
-        if re.search(rf'\b{re.escape(make)}\b', cleaned):
-            details['make'] = make.capitalize()
+    # Check popular models first (sorted by length descending to match full names first)
+    for model_key in sorted(POPULAR_CAR_MODELS.keys(), key=len, reverse=True):
+        if re.search(rf'\b{re.escape(model_key)}\b', cleaned):
+            make, model_name = POPULAR_CAR_MODELS[model_key]
+            details['make'] = make
+            details['model'] = model_name
             break
+
+    # If make not found from model, check direct makes
+    if 'make' not in details:
+        for make in CAR_MAKES:
+            if re.search(rf'\b{re.escape(make)}\b', cleaned):
+                details['make'] = make.capitalize()
+                break
 
     # Extract mileage (e.g., 75000 miles, 120k km, 90,000 mi, 45,000 km)
     mileage_match = re.search(r'(\d+[\d,]*\s*(?:k|thousand)?\s*(?:miles|mile|mi|km|kms))\b', cleaned)
@@ -156,6 +268,17 @@ def generate_rule_based_followup(text: str, session_context: dict) -> str:
     Saves AI tokens while delivering authentic mechanic investigation!
     """
     cleaned = text.lower()
+
+    # Smoke / Engine Bay Thermal Issues
+    if any(k in cleaned for k in ['smoke', 'smoking', 'steam', 'burning smell', 'oil leak', 'fumes', 'fire']):
+        return (
+            "🚨 Smoke coming from the engine bay is a high-priority warning that requires immediate attention.\n\n"
+            "To pinpoint whether this is burning oil, coolant steam, or an electrical issue:\n"
+            "• What color is the smoke? (Thick white steam, blue/grey smoke, or black smoke?)\n"
+            "• Does it have a specific odor? (Sweet syrup smell indicates boiling coolant; pungent acrid smell indicates motor oil dripping onto the hot exhaust manifold).\n"
+            "• Is the engine temperature gauge in the red zone or is the Check Engine/Oil light on?\n\n"
+            "⚠️ Safety caution: Pull over safely if you are driving. Do not open the radiator pressure cap while hot. If you can take a safe photo under the bonnet once the car is off, upload it here and I'll inspect it."
+        )
 
     # Brake related
     if any(k in cleaned for k in ['brake', 'pad', 'rotor', 'caliper', 'stopping']):

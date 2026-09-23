@@ -191,7 +191,17 @@ export default function Home() {
       setMessages((prev) => [...prev, diagNoticeMsg]);
       speakText("Diagnosis report generated with repair estimates in Indian Rupees.");
     } catch (err: any) {
-      alert(err.message || 'Failed to synthesize diagnosis.');
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `notice-${Date.now()}`,
+          session: sessionId || '',
+          sender: 'mechanic',
+          message: `ℹ️ ${err.message || 'Please describe what symptoms or trouble your vehicle is experiencing before generating a repair diagnostic report.'}`,
+          is_ai_generated: false,
+          created_at: new Date().toISOString(),
+        },
+      ]);
     } finally {
       setIsDiagnosing(false);
     }

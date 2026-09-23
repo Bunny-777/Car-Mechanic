@@ -1,5 +1,6 @@
 import random
 import string
+import logging
 import mimetypes
 from django.conf import settings
 from django.shortcuts import get_object_or_404
@@ -15,11 +16,14 @@ from .serializers import (
 from .services.classifier import (
     is_greeting, is_clearly_irrelevant, is_automotive,
     extract_vehicle_details, get_polite_rejection,
-    get_mechanic_greeting, generate_rule_based_followup
+    get_mechanic_greeting, generate_rule_based_followup,
+    has_symptoms, is_vehicle_only_intro
 )
 from .services.gemini_service import (
     chat_with_gemini, analyze_multimodal_media, synthesize_diagnosis, get_gemini_client
 )
+
+logger = logging.getLogger(__name__)
 
 
 def generate_booking_code():
@@ -63,6 +67,8 @@ class ChatView(APIView):
             session.vehicle_year = vehicle_updates['year']
         if vehicle_updates.get('make') and not session.vehicle_make:
             session.vehicle_make = vehicle_updates['make']
+        if vehicle_updates.get('model') and not session.vehicle_model:
+            session.vehicle_model = vehicle_updates['model']
         if vehicle_updates.get('mileage') and not session.vehicle_mileage:
             session.vehicle_mileage = vehicle_updates['mileage']
 
@@ -94,7 +100,7 @@ class ChatView(APIView):
             media=media_obj
         )
 
-        vehicle_str = f"{session.vehicle_year} {session.vehicle_make} {session.vehicle_model}".strip()
+        vehicle_str = f"{session.vehicle_year or ''} {session.vehicle_make or ''} {session.vehicle_model or ''}".strip()
 
         # 5. Traditional Logic & AI Minimization Strategy
         reply_text = ""
@@ -114,7 +120,21 @@ class ChatView(APIView):
             reply_text = get_polite_rejection()
             is_ai = False
 
-        # Strategy C: Check if media was uploaded with message (Multimodal AI)
+        # Strategy C: User is only naming their car without symptoms (Do not assume faults or prompt costs!)
+        elif is_vehicle_only_intro(user_text) and not media_obj and not has_session_media:
+            reply_text = (
+                f"Got it! I've noted down your {vehicle_str or 'vehicle'}. 🚗\n\n"
+                "What symptoms or trouble are you noticing with your car? For example:\n"
+                "• Strange noises (squealing brakes, engine knocking, or clicking)\n"
+                "• Smoke, steam, or burning smells under the hood\n"
+                "• Warning lights on the dashboard (Check Engine, Battery, or Temp)\n"
+                "• Performance issues (vibration, pulling to one side, or stalling)\n"
+                "• Scheduled maintenance or fluid leaks\n\n"
+                "Describe what's happening and I'll diagnose the exact mechanical cause."
+            )
+            is_ai = False
+
+        # Strategy D: Check if media was uploaded with message (Multimodal AI)
         elif media_obj and media_obj.file:
             reply_text = analyze_multimodal_media(
                 media_obj.file.path,
@@ -126,7 +146,7 @@ class ChatView(APIView):
             media_obj.save()
             is_ai = True
 
-        # Strategy D: Automotive Mechanical Query or Active Session Follow-up
+        # Strategy E: Automotive Mechanical Query or Active Session Follow-up
         elif is_automotive(user_text) or has_prior_history or has_session_media:
             client = get_gemini_client()
             prior_messages = list(
@@ -276,14 +296,32 @@ class DiagnosisView(APIView):
         if isinstance(symptoms, str):
             symptoms = [symptoms]
 
-        if not messages and not symptoms:
+        # Check if symptoms were passed directly in payload or communicated by user in messages
+        user_messages = [m.get('message', '') for m in messages if m.get('sender') == 'user']
+        all_user_text = " ".join(user_messages + symptoms).strip()
+
+        if not all_user_text or not has_symptoms(all_user_text):
             return Response(
-                {"error": "Please provide symptoms or have a conversation with the mechanic first."},
+                {
+                    "error": f"No mechanical symptoms have been reported yet for your {vehicle_str or 'vehicle'}. Please describe what trouble you are noticing (e.g. noise, smoke, fluid leak, vibration, warning light) before generating a repair diagnostic report."
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Synthesize diagnosis
-        report = synthesize_diagnosis(vehicle_str, symptoms, messages)
+        # Synthesize diagnosis — 100% AI driven, raises RuntimeError if AI is unavailable
+        try:
+            report = synthesize_diagnosis(vehicle_str, symptoms, messages)
+        except RuntimeError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error in diagnosis synthesis: {e}", exc_info=True)
+            return Response(
+                {"error": "An unexpected error occurred while generating the diagnosis. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         # Save to database
         diagnosis_obj = Diagnosis.objects.create(
@@ -295,7 +333,7 @@ class DiagnosisView(APIView):
             recommended_services=report.get('recommended_services', []),
             safety_warning=report.get('safety_warning', ''),
             estimated_cost_range=report.get('estimated_cost_range', ''),
-            ai_generated=bool(getattr(settings, 'GEMINI_API_KEY', ''))
+            ai_generated=True
         )
 
         serializer = DiagnosisSerializer(diagnosis_obj)

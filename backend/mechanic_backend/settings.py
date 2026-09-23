@@ -116,5 +116,8 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Gemini API configuration
+# Gemini API configuration (optional fallback)
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+
+# Groq API configuration (primary AI — generous free tier)
+GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
