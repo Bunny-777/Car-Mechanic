@@ -1,6 +1,14 @@
 # AI Car Mechanic Chatbot
 
-A full-stack automotive diagnostic chatbot where car owners can troubleshoot mechanical issues, upload photos, audio recordings, and videos of vehicle faults, receive repair recommendations with cost estimates, and schedule appointments with certified mechanics.
+A full-stack automotive diagnostic platform where vehicle owners troubleshoot mechanical issues, upload photos, audio recordings, and videos of vehicle faults, receive repair recommendations with cost estimates in INR (₹), and book appointments with certified mechanics.
+
+---
+
+## Live Links
+
+- **Live Frontend (Vercel)**: [https://apex-car-bot.vercel.app](https://apex-car-bot.vercel.app)
+- **Live Backend API (Render)**: [https://car-mechanic.onrender.com](https://car-mechanic.onrender.com)
+- **GitHub Repository**: [https://github.com/Bunny-777/Car-Mechanic](https://github.com/Bunny-777/Car-Mechanic)
 
 ---
 
@@ -8,20 +16,21 @@ A full-stack automotive diagnostic chatbot where car owners can troubleshoot mec
 
 The system is built as a decoupled full-stack application:
 
-- **Frontend**: Next.js (React) + TypeScript + Vanilla CSS design system. Designed for high performance, mobile responsiveness, and easy deployment to Vercel.
-- **Backend**: Python + Django 5 + Django REST Framework (DRF) + SQLite. Provides RESTful endpoints for chat sessions, file uploads, diagnostic synthesis, and appointment booking.
+- **Frontend**: Next.js (React) + TypeScript + Vanilla CSS design system. Designed for high performance, mobile responsiveness, and deployed on Vercel.
+- **Backend**: Python + Django 5 + Django REST Framework (DRF) + SQLite. Provides RESTful endpoints for chat sessions, file uploads, diagnostic synthesis, and appointment booking, deployed on Render with Gunicorn.
 - **AI Engine & Optimization**: Google Gemini 1.5/2.0 Flash used selectively, backed by a deterministic automotive rule-based diagnostic state machine.
 
 ```
                       +-----------------------------+
                       |      Next.js Frontend       |
-                      |  (Vercel Free Tier Ready)   |
+                      |   (Vercel Production Live)  |
                       +--------------+--------------+
                                      |
                              REST APIs (JSON)
                                      |
                       +--------------v--------------+
                       |    Django REST Framework    |
+                      |   (Render Production Live)  |
                       +--------------+--------------+
                                      |
              +-----------------------+-----------------------+
@@ -76,11 +85,11 @@ A primary architectural priority is **conserving API tokens and reducing latency
 ```json
 {
   "session_id": "optional-uuid",
-  "message": "My 2018 Honda Civic brakes are making a loud squealing noise when stopping",
+  "message": "My 2019 Honda City brakes are making a loud squealing noise when stopping",
   "media_id": "optional-uploaded-media-uuid",
   "vehicle_make": "Honda",
-  "vehicle_model": "Civic",
-  "vehicle_year": "2018"
+  "vehicle_model": "City",
+  "vehicle_year": "2019"
 }
 ```
 
@@ -91,21 +100,21 @@ A primary architectural priority is **conserving API tokens and reducing latency
   "user_message": {
     "id": "c1a93b4f-...",
     "sender": "user",
-    "message": "My 2018 Honda Civic brakes are making a loud squealing noise when stopping",
+    "message": "My 2019 Honda City brakes are making a loud squealing noise when stopping",
     "is_ai_generated": false,
     "created_at": "2026-09-23T14:00:00Z"
   },
   "mechanic_message": {
     "id": "e2f18c3d-...",
     "sender": "mechanic",
-    "message": "High-pitched brake squealing often points to worn brake pad wear indicators...",
+    "message": "A high-pitched squeal while braking is typically caused by the mechanical wear indicator contacting the rotor...",
     "is_ai_generated": false,
     "created_at": "2026-09-23T14:00:01Z"
   },
   "vehicle_info": {
-    "year": "2018",
+    "year": "2019",
     "make": "Honda",
-    "model": "Civic",
+    "model": "City",
     "mileage": ""
   },
   "is_ai_generated": false
@@ -128,7 +137,7 @@ A primary architectural priority is **conserving API tokens and reducing latency
   "message": "File uploaded successfully.",
   "media": {
     "id": "a91b2c3d-...",
-    "file_url": "http://127.0.0.1:8000/media/uploads/2026/09/23/rotor.png",
+    "file_url": "https://car-mechanic.onrender.com/media/uploads/2026/09/23/rotor.png",
     "file_type": "image",
     "original_name": "rotor.png",
     "file_size": 245100,
@@ -142,7 +151,7 @@ A primary architectural priority is **conserving API tokens and reducing latency
 
 ### 3. Generate Diagnostic Report
 **Endpoint**: `POST /api/diagnosis/`  
-**Description**: Compiles session symptoms into an official diagnostic report with repair cost estimates.
+**Description**: Compiles session symptoms into an official diagnostic report with repair cost estimates in INR (₹).
 
 **Request Body**:
 ```json
@@ -156,28 +165,28 @@ A primary architectural priority is **conserving API tokens and reducing latency
 {
   "id": "8b9a1c2d-...",
   "session": "3f4a9b5c-d218-4c22-b6be-e74f1b8a9201",
-  "issue_title": "Brake System Friction & Rotor Wear",
-  "summary": "Inspection indicates significant degradation of the brake friction linings below minimum safety thickness.",
+  "issue_title": "Brake Friction Material Depletion & Rotor Wear",
+  "summary": "Physical analysis indicates severe degradation of the brake friction linings below minimum safety thickness.",
   "severity": "HIGH",
   "probable_causes": [
-    "Brake friction material worn beyond minimum safety thickness (<3mm)",
-    "Brake rotor surface scoring or lateral runout (warpage)",
-    "Caliper slide pin sticking causing uneven pad wear"
+    "Brake friction material worn beyond minimum safety threshold (<3mm)",
+    "Brake rotor surface lateral runout (warpage) or circular grooving",
+    "Caliper slide pin lubrication breakdown causing uneven pad taper wear"
   ],
   "recommended_services": [
     {
       "name": "Front Brake Pads & Rotors Replacement",
-      "estimated_cost": "$250 - $400",
-      "urgency": "Immediate"
+      "estimated_cost": "₹2,800 - ₹4,800",
+      "urgency": "Soon"
     },
     {
-      "name": "Brake Fluid Moisture Test & Flush",
-      "estimated_cost": "$90 - $130",
+      "name": "Brake Fluid Moisture Test & Flush (DOT 4)",
+      "estimated_cost": "₹750 - ₹1,200",
       "urgency": "Routine"
     }
   ],
-  "safety_warning": "Avoid highway speeds or aggressive stops. Stopping distances are increased.",
-  "estimated_cost_range": "$250 - $530",
+  "safety_warning": "Replace pads promptly to prevent irreversible scoring to the brake discs.",
+  "estimated_cost_range": "₹2,800 - ₹6,000",
   "ai_generated": true,
   "created_at": "2026-09-23T14:05:00Z"
 }
@@ -194,10 +203,10 @@ A primary architectural priority is **conserving API tokens and reducing latency
 {
   "session": "3f4a9b5c-d218-4c22-b6be-e74f1b8a9201",
   "diagnosis": "8b9a1c2d-...",
-  "customer_name": "Jordan Smith",
-  "customer_email": "jordan@example.com",
-  "customer_phone": "+1-555-0149",
-  "vehicle_info": "2018 Honda Civic EX",
+  "customer_name": "Kushan Sharma",
+  "customer_email": "kushan@example.com",
+  "customer_phone": "+91-9876543210",
+  "vehicle_info": "2019 Honda City ZX",
   "service_requested": "Front Brake Pads & Rotors Replacement",
   "preferred_date": "2026-10-12",
   "preferred_time_slot": "09:00 AM - 11:00 AM",
@@ -210,10 +219,10 @@ A primary architectural priority is **conserving API tokens and reducing latency
 {
   "id": "e4f5a6b7-...",
   "booking_code": "BK-X84K92",
-  "customer_name": "Jordan Smith",
-  "customer_email": "jordan@example.com",
-  "customer_phone": "+1-555-0149",
-  "vehicle_info": "2018 Honda Civic EX",
+  "customer_name": "Kushan Sharma",
+  "customer_email": "kushan@example.com",
+  "customer_phone": "+91-9876543210",
+  "vehicle_info": "2019 Honda City ZX",
   "service_requested": "Front Brake Pads & Rotors Replacement",
   "preferred_date": "2026-10-12",
   "preferred_time_slot": "09:00 AM - 11:00 AM",
@@ -234,8 +243,8 @@ A primary architectural priority is **conserving API tokens and reducing latency
 {
   "id": "e4f5a6b7-...",
   "booking_code": "BK-X84K92",
-  "customer_name": "Jordan Smith",
-  "vehicle_info": "2018 Honda Civic EX",
+  "customer_name": "Kushan Sharma",
+  "vehicle_info": "2019 Honda City ZX",
   "service_requested": "Front Brake Pads & Rotors Replacement",
   "preferred_date": "2026-10-12",
   "preferred_time_slot": "09:00 AM - 11:00 AM",
@@ -298,22 +307,22 @@ Open `http://localhost:3000` in your browser.
 
 ---
 
-## Deployment Guide
+## Deployment Configuration
 
-### Frontend on Vercel (Free Tier)
-1. Push this repository to GitHub.
-2. Log into [Vercel](https://vercel.com/) and click **Add New > Project**.
-3. Select this repository and set the **Root Directory** to `frontend`.
-4. Add the environment variable:
-   - `NEXT_PUBLIC_API_URL`: Your live backend URL (e.g. `https://your-api.onrender.com` or AWS EC2 IP).
-5. Click **Deploy**.
+### 1. Backend Deployment on Render (Free Tier)
+1. In Render, create a new **Web Service** connected to `Bunny-777/Car-Mechanic`.
+2. Configure settings:
+   - **Root Directory**: `backend`
+   - **Build Command**: `./build.sh`
+   - **Start Command**: `gunicorn mechanic_backend.wsgi:application`
+3. Environment variables:
+   - `GEMINI_API_KEY`: *(Your Google Gemini API key)*
+   - `DJANGO_SECRET_KEY`: `your-production-secret-key`
 
-### Backend on AWS Free Tier (EC2 / Lightsail) or Render
-1. Launch an Ubuntu 22.04 t2.micro instance (eligible for AWS Free Tier) or deploy on Render/Railway.
-2. Clone repo, install Python, and set up gunicorn / systemd service:
-   ```bash
-   pip install gunicorn
-   gunicorn mechanic_backend.wsgi:application --bind 0.0.0.0:8000
-   ```
-3. Set environment variable `GEMINI_API_KEY` on the host.
-4. Allow HTTP port 8000 in AWS Security Groups.
+### 2. Frontend Deployment on Vercel (Free Tier)
+1. In Vercel, import `Bunny-777/Car-Mechanic`.
+2. Configure settings:
+   - **Root Directory**: `frontend`
+   - **Framework Preset**: Next.js
+3. Environment variables:
+   - `NEXT_PUBLIC_API_URL`: `https://car-mechanic.onrender.com`
