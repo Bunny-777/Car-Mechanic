@@ -300,10 +300,10 @@ class DiagnosisView(APIView):
         user_messages = [m.get('message', '') for m in messages if m.get('sender') == 'user']
         all_user_text = " ".join(user_messages + symptoms).strip()
 
-        if not all_user_text or not has_symptoms(all_user_text):
+        if not all_user_text:
             return Response(
                 {
-                    "error": f"No mechanical symptoms have been reported yet for your {vehicle_str or 'vehicle'}. Please describe what trouble you are noticing (e.g. noise, smoke, fluid leak, vibration, warning light) before generating a repair diagnostic report."
+                    "error": f"Please describe what problem you are experiencing with your {vehicle_str or 'vehicle'} before generating a report."
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
