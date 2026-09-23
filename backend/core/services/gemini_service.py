@@ -41,8 +41,8 @@ def get_model(client):
 
 def chat_with_gemini(conversation_history: list, current_message: str, vehicle_info: str = "") -> str:
     """
-    Called only for nuanced automotive queries where rule-based logic cannot resolve.
-    Preserves tokens and limits unnecessary calls while providing deep mechanical expertise.
+    Called for automotive troubleshooting queries.
+    Provides a dynamic, expert, highly tailored mechanic response.
     """
     client = get_gemini_client()
     if not client:
@@ -58,25 +58,28 @@ def chat_with_gemini(conversation_history: list, current_message: str, vehicle_i
     system_instruction = (
         "You are Mac, an ASE Master Certified senior automotive technician with 25 years of workshop experience. "
         "Your role is strictly automotive diagnostics and vehicle repair advice. "
-        "Speak with practical technical authority, empathy, and professional expertise. "
-        "Provide clear, informative mechanical explanations in plain English without excessive academic jargon. "
+        "Actively listen to what the customer says and respond dynamically—NEVER repeat generic or canned troubleshooting checklists. "
+        "Directly answer their specific question or symptom with deep mechanical insight. "
+        "Explain what components could be failing (e.g. worn bushings, glazed pads, alternator diode, vacuum leak, solenoid, etc.), "
+        "why it happens, and what physical test or inspection they should perform. "
         "Highlight safety implications (such as brake failures, overheating, steering play, or fuel leaks). "
-        "Always ask 1-2 sharp, focused diagnostic questions to isolate the root cause before jumping to conclusions. "
-        "Do not answer off-topic questions. Stick strictly to automobiles, mechanical systems, and vehicle care. "
-        "When estimating prices, use Indian Rupee (INR / ₹) currency with realistic workshop pricing."
+        "Keep the response engaging, informative, and formatted with clean bullet points where helpful. "
+        "Do not answer off-topic non-car questions. When discussing costs, use Indian Rupee (INR / ₹) currency."
     )
 
     prompt = f"System Instruction: {system_instruction}\n\n"
     if vehicle_info:
-        prompt += f"Vehicle: {vehicle_info}\n\n"
+        prompt += f"Active Vehicle Profile: {vehicle_info}\n\n"
 
-    # Add last few conversation turns for context
-    recent_history = conversation_history[-4:] if len(conversation_history) > 4 else conversation_history
-    for msg in recent_history:
-        role = "Technician" if msg.get('sender') == 'mechanic' else "Customer"
-        prompt += f"{role}: {msg.get('message', '')}\n"
+    if conversation_history:
+        prompt += "Previous Discussion Context:\n"
+        for msg in conversation_history[-6:]:
+            role = "Technician" if msg.get('sender') == 'mechanic' else "Customer"
+            prompt += f"{role}: {msg.get('message', '')}\n"
+        prompt += "\n"
 
-    prompt += f"Customer: {current_message}\nTechnician:"
+    prompt += f"Customer's Current Message: {current_message}\n"
+    prompt += "Technician (Respond directly to what they said, explain the exact mechanical cause, and advise next steps):"
 
     try:
         model = get_model(client)

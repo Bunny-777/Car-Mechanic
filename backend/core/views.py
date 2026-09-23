@@ -18,7 +18,7 @@ from .services.classifier import (
     get_mechanic_greeting, generate_rule_based_followup
 )
 from .services.gemini_service import (
-    chat_with_gemini, analyze_multimodal_media, synthesize_diagnosis
+    chat_with_gemini, analyze_multimodal_media, synthesize_diagnosis, get_gemini_client
 )
 
 
@@ -121,28 +121,40 @@ class ChatView(APIView):
             media_obj.save()
             is_ai = True
 
-        # Strategy D: Check for common car symptoms with deterministic diagnostic tree (0 AI Tokens)
-        else:
-            rule_followup = generate_rule_based_followup(user_text, {
-                'vehicle': vehicle_str,
-                'has_media': bool(media_obj)
-            })
+        # Strategy D: Automotive Mechanical Query (Dynamic AI with Rule Fallback)
+        elif is_automotive(user_text):
+            client = get_gemini_client()
+            prior_messages = list(
+                session.messages.exclude(id=user_message_obj.id).values('sender', 'message')[:8]
+            )
 
-            if rule_followup:
-                reply_text = rule_followup
-                is_ai = False
-            elif is_automotive(user_text):
-                # Nuanced automotive query: Call Gemini with limited history
-                history = list(session.messages.values('sender', 'message')[:10])
-                reply_text = chat_with_gemini(history, user_text, vehicle_str)
+            # If Gemini is configured, provide dynamic, nuanced mechanic troubleshooting
+            if client:
+                reply_text = chat_with_gemini(prior_messages, user_text, vehicle_str)
                 is_ai = True
             else:
-                # Ambiguous query - prompt user for car context
-                reply_text = (
-                    "Could you specify how this relates to your car's symptoms or maintenance? "
-                    "I want to make sure I give you accurate mechanical advice."
-                )
+                # If Gemini is offline/unconfigured, use deterministic decision tree
+                rule_followup = generate_rule_based_followup(user_text, {
+                    'vehicle': vehicle_str,
+                    'has_media': bool(media_obj)
+                })
+                if rule_followup and not prior_messages:
+                    reply_text = rule_followup
+                else:
+                    reply_text = (
+                        f"Understood. For {vehicle_str or 'your vehicle'}, this symptom usually points to mechanical "
+                        "wear or component fatigue in that specific system. "
+                        "Does this happen constantly or only under specific conditions (e.g. at highway speeds, over bumps, or when cold)? "
+                        "Click 'Generate Full Diagnostic Report (₹)' anytime to see estimated repair costs."
+                    )
                 is_ai = False
+        else:
+            # Ambiguous query - prompt user for car context (0 AI tokens)
+            reply_text = (
+                "Could you specify how this relates to your car's symptoms or maintenance? "
+                "I want to make sure I give you accurate mechanical advice."
+            )
+            is_ai = False
 
         # 6. Save Mechanic Message
         mechanic_message_obj = ChatMessage.objects.create(
