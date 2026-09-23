@@ -35,7 +35,7 @@ CAR_MAKES = {
     'audi', 'lexus', 'jeep', 'dodge', 'ram', 'chrysler', 'volvo', 'porsche',
     'mitsubishi', 'land rover', 'range rover', 'jaguar', 'infiniti', 'acura',
     'cadillac', 'buick', 'gmc', 'lincoln', 'tesla', 'mini', 'fiat', 'genesis',
-    'skoda', 'renault', 'peugeot', 'suzuki', 'tata', 'mahindra'
+    'skoda', 'renault', 'peugeot', 'suzuki', 'maruti', 'maruti suzuki', 'tata', 'mahindra'
 }
 
 NON_CAR_TOPICS = [
@@ -88,7 +88,7 @@ def is_automotive(text: str) -> bool:
         return True
         
     # Check for common vehicle phrase structures (e.g., "my 2015 car", "engine light")
-    if re.search(r'\b(19\d\d|20\d\d)\b', cleaned) and any(w in cleaned for w in ['miles', 'km', 'wheel', 'door', 'hood', 'trunk']):
+    if re.search(r'\b(19\d\d|20\d\d)\b', cleaned) and any(w in cleaned for w in ['miles', 'km', 'wheel', 'door', 'hood', 'bonnet', 'trunk', 'boot']):
         return True
 
     return False
@@ -109,7 +109,7 @@ def extract_vehicle_details(text: str) -> dict:
             details['make'] = make.capitalize()
             break
 
-    # Extract mileage (e.g., 75000 miles, 120k km, 90,000 mi)
+    # Extract mileage (e.g., 75000 miles, 120k km, 90,000 mi, 45,000 km)
     mileage_match = re.search(r'(\d+[\d,]*\s*(?:k|thousand)?\s*(?:miles|mile|mi|km|kms))\b', cleaned)
     if mileage_match:
         details['mileage'] = mileage_match.group(1).strip()
@@ -119,21 +119,21 @@ def extract_vehicle_details(text: str) -> dict:
 
 def get_polite_rejection() -> str:
     return (
-        "I'm an automotive technician, so I stick strictly to what I know best—diagnosing car issues, "
-        "mechanical faults, warning lights, and vehicle maintenance. If you've got a problem with your vehicle "
-        "(strange noises, fluid leaks, performance drops, or check engine codes), let me know what car you're "
-        "driving and what symptoms you're seeing!"
+        "I'm an automotive technician, so I specialize strictly in vehicle diagnostics, mechanical troubleshooting, "
+        "and maintenance. If you're experiencing any car troubles—like unusual engine noises, brake issues, fluid leaks, "
+        "vibrations, or dashboard warning lights—tell me what vehicle you drive and the symptoms you're noticing, "
+        "and I'll be glad to help inspect it."
     )
 
 
 def get_mechanic_greeting() -> str:
     return (
-        "G'day! I'm your virtual senior mechanic. I'm here to help you troubleshoot and diagnose any car trouble "
-        "you're dealing with.\n\n"
-        "To get started, tell me:\n"
-        "1. What is the Year, Make, and Model of your car?\n"
-        "2. What issue or unusual symptom (noise, vibration, leak, dashboard light) are you experiencing?\n\n"
-        "You can also upload photos of parts/dashboard, engine sound recordings, or videos anytime."
+        "Hello! I'm Mac, your senior automotive technician. I'm here to help you get to the bottom of whatever "
+        "is going on with your vehicle.\n\n"
+        "To help me pinpoint the issue accurately, please share:\n"
+        "1. What is the Year, Make, and Model of your car? (e.g. 2019 Honda City or 2018 Maruti Swift)\n"
+        "2. What symptoms are you noticing? (e.g. grinding noise, shuddering at speed, hard pedal, check engine light)\n\n"
+        "You can also attach a photo of the affected component, record engine audio directly, or share a video clip."
     )
 
 
@@ -148,64 +148,82 @@ def generate_rule_based_followup(text: str, session_context: dict) -> str:
     if any(k in cleaned for k in ['brake', 'pad', 'rotor', 'caliper', 'stopping']):
         if 'squeal' in cleaned or 'squeak' in cleaned:
             return (
-                "High-pitched brake squealing often points to worn brake pad wear indicators or glazed rotors.\n\n"
-                "A couple of quick diagnostic questions:\n"
-                "• Does the squeal happen only under light pedal pressure or even when braking firmly?\n"
-                "• Does it squeak in reverse or first thing in the morning when moisture is on the rotors?\n\n"
-                "If you can snap a photo through your wheel spokes showing the brake pad thickness or rotor surface, upload it and I'll inspect the wear."
+                "A high-pitched squeal while braking is typically caused by the mechanical wear indicator contacting the rotor, "
+                "or glazed brake pads from heavy heat cycles.\n\n"
+                "Let's narrow down the exact cause:\n"
+                "• Does the squeal happen only under light braking, or does it persist during firm stops as well?\n"
+                "• Does it occur mostly first thing in the morning when cold, or continuously once the brakes warm up?\n"
+                "• Do you feel any pulsating or vibration through the brake pedal?\n\n"
+                "💡 Pro-tip: If you can snap a photo through your wheel spokes showing the pad thickness or rotor surface, upload it and I'll inspect the wear."
             )
         if 'grind' in cleaned or 'scrape' in cleaned:
             return (
-                "⚠️ Metal-on-metal grinding when braking is critical. This usually means the friction material is completely worn down to the metal backing plate against the rotor.\n\n"
-                "• Do you feel a pulsation through the brake pedal or vibration in the steering wheel?\n"
-                "• Is the vehicle pulling to one side when you brake?\n\n"
-                "I strongly advise not driving at highway speeds until inspected. You can click 'Generate Diagnosis' to see estimated repair costs or schedule a shop inspection."
+                "⚠️ Metal-on-metal grinding when braking is a serious safety concern. It almost certainly means your brake pad friction material is completely worn out, and the steel backing plate is gouging into the brake rotor.\n\n"
+                "To assess the severity:\n"
+                "• Does the car pull sharply to one side when you step on the pedal?\n"
+                "• Do you feel a violent shudder or vibration in the steering wheel or brake pedal?\n\n"
+                "🚨 Advice: I recommend avoiding high-speed driving or highway commutes until this is addressed, as stopping distances are severely compromised. Click 'Generate Full Diagnostic Report' below for repair estimates, and we can get a technician booked to replace the pads and rotors."
             )
 
     # Battery / Starter / No-start
     if any(k in cleaned for k in ['start', 'crank', 'battery', 'alternator', 'turn over']):
         if 'click' in cleaned or 'rapid click' in cleaned:
             return (
-                "Rapid clicking when turning the key or pushing start is a classic symptom of low battery voltage or corroded battery terminals.\n\n"
-                "Let's narrow it down:\n"
-                "• Are your dashboard lights or headlights dim or flickering when you try to crank?\n"
-                "• How old is your current 12V battery (typically batteries last 3-5 years)?\n"
-                "• Have you checked for white or bluish crusty corrosion around the battery terminals?"
+                "A rapid clicking sound when you turn the ignition key or push the start button is the starter solenoid engaging and immediately dropping out due to low voltage under load.\n\n"
+                "Here is what we need to check:\n"
+                "• Do the dashboard lights, cabin lights, or headlights dim significantly when you try to crank?\n"
+                "• How old is your 12V battery (most car batteries have a reliable lifespan of 3 to 4 years)?\n"
+                "• Have you noticed any white, blue, or greenish powdery corrosion build-up around the battery terminals?\n\n"
+                "If you have a multimeter handy, measure the resting voltage across the terminals—it should read 12.4V to 12.6V."
             )
         if 'crank' in cleaned and ('no start' in cleaned or 'won\'t start' in cleaned):
             return (
-                "If the engine cranks strongly but refuses to catch fire, the starter and battery are likely okay, but we're missing one of the essentials: Fuel, Spark, or Air.\n\n"
-                "• Do you hear the fuel pump hum for 2 seconds from the rear when you first turn the ignition to 'ON'?\n"
-                "• Is the security/theft light flashing on the dash?\n"
-                "• When was the last time the fuel filter or spark plugs were replaced?"
+                "If the engine cranks over vigorously but won't fire up, your starter and battery are likely healthy. An internal combustion engine needs four pillars to start: Fuel, Spark, Air, and Compression.\n\n"
+                "Let's run through a quick diagnostic check:\n"
+                "• When you switch the ignition to 'ON' without cranking, do you hear a faint 2-second hum from the rear seat area? (That's the fuel pump priming).\n"
+                "• Is the security or immobilizer key symbol flashing rapidly on the dashboard?\n"
+                "• Did the car stall suddenly while driving, or did this happen after parking overnight?"
             )
 
     # Overheating / Coolant
-    if any(k in cleaned for k in ['overheat', 'overheating', 'coolant', 'temperature', 'steam', 'hot']):
+    if any(k in cleaned for k in ['overheat', 'overheating', 'coolant', 'temperature', 'steam', 'hot', 'radiator']):
         return (
-            "🚨 Engine overheating needs immediate attention to prevent a blown head gasket or cracked cylinder head.\n\n"
-            "Key diagnostic questions:\n"
-            "• Is there visible white sweet-smelling steam from under the hood or a puddle of green/pink/orange coolant underneath?\n"
-            "• Does the temperature rise while idling in traffic, or does it spike when driving at speed on the open road?\n"
-            "• Is the radiator cooling fan turning on when the engine gets warm?"
+            "🚨 Engine overheating can cause catastrophic damage (warped cylinder head, blown head gasket) in just a few minutes. Please pull over safely if driving!\n\n"
+            "To diagnose the failure point:\n"
+            "• Is there visible steam escaping from under the bonnet, or a puddle of green, pink, or orange coolant underneath the engine bay?\n"
+            "• Does the temperature gauge spike when you are stuck in traffic at idle, or when driving at higher speeds on open roads?\n"
+            "• Can you hear the electric radiator cooling fan kicking on when the temperature gauge rises above halfway?\n\n"
+            "⚠️ Safety reminder: Never attempt to open the radiator cap while the engine is hot—it is under extreme steam pressure."
         )
 
     # Check Engine Light / Misfire
     if any(k in cleaned for k in ['check engine', 'cel', 'misfire', 'rough idle', 'shaking']):
         return (
-            "A check engine light combined with a rough idle typically indicates an engine misfire (often bad spark plugs, faulty ignition coils, or vacuum leaks).\n\n"
-            "• Is the check engine light staying solid, or is it FLASHING? (If it's flashing, stop driving—raw fuel can destroy the catalytic converter).\n"
-            "• Do you have an OBD-II scanner reading or a code (like P0300, P0301, P0171)?\n"
-            "• Does the shaking smooth out when you give it a little throttle?"
+            "A Check Engine Light accompanied by a rough idle or engine shudder indicates a cylinder misfire or air-fuel mixture imbalance (often bad ignition coils, fouled spark plugs, or a vacuum leak).\n\n"
+            "Important diagnostic details:\n"
+            "• Is the Check Engine Light illuminated steady, or is it FLASHING? (A flashing check engine light indicates an active severe misfire that can destroy the catalytic converter within miles).\n"
+            "• Does the shuddering smooth out once you accelerate past 2,000 RPM, or does it get worse under load?\n"
+            "• Do you have an OBD-II scanner code (such as P0300 random misfire, or cylinder-specific P0301-P0304)?"
+        )
+
+    # AC / Air Conditioning
+    if any(k in cleaned for k in ['ac', 'air conditioning', 'cooling', 'blows warm', 'compressor', 'chilled']):
+        return (
+            "If your vehicle's air conditioner is blowing warm ambient air instead of chilled air, it usually boils down to low refrigerant (gas leak), an AC compressor clutch failure, or a clogged cabin air filter.\n\n"
+            "Let's troubleshoot:\n"
+            "• When you toggle the AC button on, do you hear a distinct 'click' from the engine bay and a slight dip in engine RPM? (That's the compressor magnetic clutch engaging).\n"
+            "• Does the air blow slightly cool when driving at highway speeds, but warm while stopped at traffic lights?\n"
+            "• Is there any hissing sound coming from behind the dashboard vents when you switch the AC on?"
         )
 
     # Transmission / Shifting
-    if any(k in cleaned for k in ['transmission', 'gear', 'shift', 'slipping', 'clutch']):
+    if any(k in cleaned for k in ['transmission', 'gear', 'shift', 'slipping', 'clutch', 'gearbox']):
         return (
-            "Transmission slippage or harsh engagement should be addressed before internal clutch packs wear further.\n\n"
-            "• Does the engine RPM shoot up without the car accelerating proportionally (slipping)?\n"
-            "• Have you checked the transmission fluid level and color on the dipstick (should be bright/translucent pinkish-red, not dark brown or burnt smelling)?\n"
-            "• Does the issue happen between specific gears (e.g. 1st to 2nd) or when putting it into Reverse?"
+            "Transmission slippage or harsh gear shifts should be diagnosed early to prevent internal gear or clutch pack destruction.\n\n"
+            "Key diagnostic questions:\n"
+            "• Does the engine RPM rev up when you step on the accelerator, but the car takes a moment to actually speed up (slipping)?\n"
+            "• If it's an automatic, does it hesitate or jerk when shifting between 1st and 2nd gear, or when shifting into Reverse?\n"
+            "• If it's a manual, is the clutch pedal biting very high up near the top, or is it hard to engage gears when stopped?"
         )
 
     return ""

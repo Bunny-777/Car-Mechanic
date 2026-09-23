@@ -16,14 +16,14 @@ class MechanicAPITests(TestCase):
         response = self.client.post('/api/chat/', {'message': 'Hello there!'}, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data['is_ai_generated'])
-        self.assertIn("G'day!", response.data['mechanic_message']['message'])
+        self.assertIn("Mac", response.data['mechanic_message']['message'])
 
     def test_irrelevant_query_rejected_politely_no_ai(self):
         """Non-automotive queries should be rejected with zero AI tokens."""
         response = self.client.post('/api/chat/', {'message': 'Can you give me a recipe for chocolate cake?'}, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data['is_ai_generated'])
-        self.assertIn("strictly to what I know best", response.data['mechanic_message']['message'])
+        self.assertIn("specialize strictly in vehicle diagnostics", response.data['mechanic_message']['message'])
 
     def test_brake_symptom_diagnostic_followup(self):
         """Common car symptoms should trigger diagnostic follow-up questions."""

@@ -42,24 +42,28 @@ def get_model(client):
 def chat_with_gemini(conversation_history: list, current_message: str, vehicle_info: str = "") -> str:
     """
     Called only for nuanced automotive queries where rule-based logic cannot resolve.
-    Preserves tokens and limits unnecessary calls.
+    Preserves tokens and limits unnecessary calls while providing deep mechanical expertise.
     """
     client = get_gemini_client()
     if not client:
         return (
-            f"Based on your description regarding {vehicle_info or 'your vehicle'}, this symptom typically requires "
-            "checking mechanical clearances, fluid levels, and electrical continuity. "
-            "Could you tell me if this happens more when the engine is cold or at operating temperature? "
-            "You can also upload a photo or sound recording for a deeper look."
+            f"Based on what you're describing with {vehicle_info or 'your vehicle'}, this symptom points towards an issue "
+            "with mechanical clearances, vacuum integrity, or electrical circuit continuity.\n\n"
+            "To narrow it down:\n"
+            "• Does this happen mainly on cold starts or once the engine has warmed up to normal operating temperature?\n"
+            "• Have you noticed any dashboard warning indicators (like Check Engine, ABS, or Battery lights)?\n\n"
+            "If you can snap a photo or record the sound of the engine running, attach it here and I'll analyze it."
         )
 
     system_instruction = (
-        "You are Mac, an ASE Master Certified Automotive Technician with 25 years in an independent repair shop. "
+        "You are Mac, an ASE Master Certified senior automotive technician with 25 years of workshop experience. "
         "Your role is strictly automotive diagnostics and vehicle repair advice. "
-        "Keep your answers concise, practical, technical, and grounded in real-world mechanic procedures. "
-        "Ask 1-2 focused diagnostic questions to isolate the root cause before jumping to final conclusions. "
-        "Always highlight safety risks (e.g., brake failures, overheating, fuel leaks). "
-        "Do not answer off-topic questions. Stick strictly to cars and mechanical repairs."
+        "Speak with practical technical authority, empathy, and professional expertise. "
+        "Provide clear, informative mechanical explanations in plain English without excessive academic jargon. "
+        "Highlight safety implications (such as brake failures, overheating, steering play, or fuel leaks). "
+        "Always ask 1-2 sharp, focused diagnostic questions to isolate the root cause before jumping to conclusions. "
+        "Do not answer off-topic questions. Stick strictly to automobiles, mechanical systems, and vehicle care. "
+        "When estimating prices, use Indian Rupee (INR / ₹) currency with realistic workshop pricing."
     )
 
     prompt = f"System Instruction: {system_instruction}\n\n"
@@ -84,9 +88,10 @@ def chat_with_gemini(conversation_history: list, current_message: str, vehicle_i
         logger.info(f"Gemini API chat call skipped/failed ({e}). Using expert mechanic heuristic.")
         
     return (
-        "Got your note. Based on what you've described, this points towards an issue in the primary operating circuit. "
-        "Does the vehicle exhibit any corresponding check engine codes or noticeable change in performance? "
-        "Feel free to upload an image or audio clip so I can inspect it closer."
+        f"Understood. For {vehicle_info or 'this vehicle'}, this symptom usually stems from either a sensor calibration error, "
+        "a mechanical vacuum leak, or component fatigue under load.\n\n"
+        "Could you let me know if this happens more during acceleration, idling, or under braking? "
+        "Uploading an engine sound clip or photo of the bay will help me give you an exact assessment."
     )
 
 
@@ -97,43 +102,46 @@ def analyze_multimodal_media(file_path: str, file_type: str, user_prompt: str = 
     client = get_gemini_client()
     if not client or not os.path.exists(file_path):
         return (
-            f"Received {file_type} file for inspection. Our workshop analyzer registered the upload. "
-            "Please describe where on the vehicle this was captured or when the noise occurs so I can cross-reference it."
+            f"Received the {file_type} file for inspection. Our workshop diagnostic system has logged the file.\n\n"
+            "To help me cross-reference the physical evidence:\n"
+            "• Exactly where on the vehicle was this captured?\n"
+            "• Does the symptom occur constantly or intermittently?"
         )
 
     try:
-        model = client.GenerativeModel('gemini-1.5-flash')
-        technician_prompt = (
-            "You are a master mechanic inspecting an uploaded automotive media diagnostic file. "
-            "Analyze what you see or hear: identify the vehicle component, look for signs of wear, cracks, "
-            "fluid discoloration, warning lights, leaks, or abnormal mechanical acoustics. "
-            "Give a clear, 3-4 sentence professional mechanic assessment and what inspection step to take next."
-        )
+        model = get_model(client)
+        if model:
+            technician_prompt = (
+                "You are an ASE Master Certified mechanic inspecting an uploaded automotive media diagnostic file. "
+                "Analyze what you observe: identify the automotive component, look for signs of wear, hairline cracks, "
+                "scoring, fluid leaks/discoloration, warning indicators, or abnormal acoustic frequency (knocks, squeals, rattles). "
+                "Give a comprehensive, 3-4 sentence professional mechanic assessment, explain the potential mechanical failure, "
+                "and clearly state what physical inspection step the technician should perform next. Use INR (₹) if discussing repairs."
+            )
 
-        if file_type == 'image':
-            img = Image.open(file_path)
-            response = model.generate_content([technician_prompt, img, user_prompt or "Inspect this vehicle photo."])
-            return response.text.strip()
-            
-        elif file_type in ['audio', 'video']:
-            # Upload file via genai file API for audio/video
-            uploaded_file = client.upload_file(path=file_path)
-            response = model.generate_content([technician_prompt, uploaded_file, user_prompt or f"Analyze this automotive {file_type} recording."])
-            return response.text.strip()
+            if file_type == 'image':
+                img = Image.open(file_path)
+                response = model.generate_content([technician_prompt, img, user_prompt or "Inspect this vehicle component photo."])
+                return response.text.strip()
+                
+            elif file_type in ['audio', 'video']:
+                uploaded_file = client.upload_file(path=file_path)
+                response = model.generate_content([technician_prompt, uploaded_file, user_prompt or f"Analyze this automotive {file_type} recording."])
+                return response.text.strip()
 
     except Exception as e:
         logger.warning(f"Multimodal inspection error: {e}")
 
     return (
-        f"Inspected the uploaded {file_type}. The physical evidence has been logged with your session. "
-        "To narrow down the diagnosis, let me know if this was recorded under load, during braking, or at idle."
+        f"Inspected the uploaded {file_type}. The diagnostic visual/audio evidence has been recorded in your session.\n\n"
+        "To pinpoint the exact mechanical failure, tell me if this symptom changes with vehicle speed, engine temperature, or steering angle."
     )
 
 
 def synthesize_diagnosis(vehicle_info: str, symptoms: list, messages: list) -> dict:
     """
     Generates a structured diagnosis report with severity, probable causes,
-    and repair recommendations. Uses Gemini if available, or expert fallback.
+    and repair recommendations in INR (₹). Uses Gemini if available, or expert fallback.
     """
     client = get_gemini_client()
     conversation_summary = "\n".join([f"- {m.get('sender')}: {m.get('message')}" for m in messages[-8:]])
@@ -145,6 +153,8 @@ Vehicle: {vehicle_info or 'Unknown Car'}
 Reported Symptoms / Conversation:
 {conversation_summary}
 
+IMPORTANT: All estimated costs must be formatted in Indian Rupees (INR / ₹) with realistic Indian automotive repair market rates (e.g. ₹1,500 - ₹3,500).
+
 Respond ONLY with a valid JSON object matching this schema:
 {{
   "issue_title": "Concise mechanical issue name (e.g. Worn Front Brake Pads & Warped Rotors)",
@@ -152,10 +162,10 @@ Respond ONLY with a valid JSON object matching this schema:
   "severity": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
   "probable_causes": ["Cause 1", "Cause 2", "Cause 3"],
   "recommended_services": [
-    {{"name": "Service name", "estimated_cost": "$XXX - $YYY", "urgency": "Immediate / Soon / Routine"}}
+    {{"name": "Service name", "estimated_cost": "₹X,XXX - ₹Y,YYY", "urgency": "Immediate / Soon / Routine"}}
   ],
   "safety_warning": "Actionable driving safety advice.",
-  "estimated_cost_range": "$XXX - $YYY"
+  "estimated_cost_range": "₹X,XXX - ₹Y,YYY"
 }}
 """
         try:
@@ -174,65 +184,85 @@ Respond ONLY with a valid JSON object matching this schema:
         except Exception as e:
             logger.info(f"Gemini diagnosis synthesis skipped ({e}). Using deterministic diagnostic engine.")
 
-    # High-accuracy fallback diagnostic engine based on symptoms
+    # High-accuracy fallback diagnostic engine based on symptoms with realistic INR pricing
     all_text = " ".join([m.get('message', '') for m in messages]).lower()
 
     if any(k in all_text for k in ['brake', 'pad', 'rotor', 'caliper', 'squeal', 'grind']):
         is_grind = 'grind' in all_text or 'scrape' in all_text
         return {
-            "issue_title": "Brake System Friction & Rotor Wear",
-            "summary": "Inspection indicates significant degradation of the brake friction linings. " + 
-                       ("The metal backing plate is contacting the rotor face, creating metal-to-metal contact." if is_grind else "Acoustic wear sensors have contacted the rotor indicating pads are below 3mm thickness."),
+            "issue_title": "Brake Friction Material Depletion & Rotor Wear",
+            "summary": "Physical analysis indicates severe degradation of the brake friction linings. " + 
+                       ("The steel backing plate is contacting the rotor face, creating metal-to-metal scoring and heat spots." if is_grind else "Acoustic wear sensors have contacted the rotor surface, indicating pads are below 3mm thickness."),
             "severity": "CRITICAL" if is_grind else "HIGH",
             "probable_causes": [
-                "Brake friction material worn beyond minimum safety thickness (<3mm)",
-                "Brake rotor surface scoring or lateral runout (warpage)",
-                "Caliper slide pin sticking causing uneven pad wear"
+                "Brake friction material worn beyond minimum safety threshold (<3mm)",
+                "Brake rotor surface lateral runout (warpage) or circular grooving",
+                "Caliper slide pin lubrication breakdown causing uneven pad taper wear"
             ],
             "recommended_services": [
-                {"name": "Front Brake Pads & Rotors Replacement", "estimated_cost": "$250 - $400", "urgency": "Immediate" if is_grind else "Soon"},
-                {"name": "Brake Fluid Moisture Test & Flush", "estimated_cost": "$90 - $130", "urgency": "Routine"}
+                {"name": "Front Brake Pads & Rotors Replacement", "estimated_cost": "₹2,800 - ₹4,800", "urgency": "Immediate" if is_grind else "Soon"},
+                {"name": "Brake Fluid Moisture Test & Flush (DOT 4)", "estimated_cost": "₹750 - ₹1,200", "urgency": "Routine"}
             ],
-            "safety_warning": "Avoid highway driving or heavy braking. Stopping distances are compromised." if is_grind else "Have pads replaced before they cause irreparable damage to the rotors.",
-            "estimated_cost_range": "$250 - $530"
+            "safety_warning": "CRITICAL: Do not drive at highway speeds or under heavy loads. Stopping distances are severely degraded." if is_grind else "Replace pads promptly to prevent irreversible scoring to the brake discs.",
+            "estimated_cost_range": "₹2,800 - ₹6,000"
         }
 
     if any(k in all_text for k in ['battery', 'alternator', 'click', 'start', 'crank']):
         return {
-            "issue_title": "Electrical Charging & Starting Circuit Failure",
-            "summary": "Vehicle is suffering from insufficient starter motor voltage or failed charging system alternator output, preventing combustion cycle initiation.",
+            "issue_title": "Electrical Starting Circuit & Battery Failure",
+            "summary": "The vehicle electrical system has inadequate cranking voltage or a failed charging circuit, preventing the starter motor from turning the crankshaft.",
             "severity": "MEDIUM",
             "probable_causes": [
-                "12V Lead-acid / AGM battery internal cell degradation",
-                "Alternator voltage regulator failure (<13.5V under load)",
-                "Corroded battery post terminals causing high resistance"
+                "12V Lead-acid battery internal cell sulfation or end-of-life (>3 years old)",
+                "Alternator diode failure or worn brushes providing <13.5V under load",
+                "Corroded lead battery terminals causing high electrical resistance"
             ],
             "recommended_services": [
-                {"name": "Battery Load Test & Terminal Cleaning", "estimated_cost": "$35 - $60", "urgency": "Immediate"},
-                {"name": "12V Battery Replacement", "estimated_cost": "$160 - $240", "urgency": "Immediate"},
-                {"name": "Alternator Output Diagnostic Test", "estimated_cost": "$75 - $110", "urgency": "Soon"}
+                {"name": "12V Automotive Battery Replacement (Exide / Amaron)", "estimated_cost": "₹4,200 - ₹6,500", "urgency": "Immediate"},
+                {"name": "Battery Terminal Cleaning & Anti-Corrosion Treatment", "estimated_cost": "₹250 - ₹450", "urgency": "Immediate"},
+                {"name": "Alternator Output & Starter Draw Diagnostic", "estimated_cost": "₹600 - ₹950", "urgency": "Soon"}
             ],
-            "safety_warning": "Do not turn off engine in unsafe locations if jump-started, as alternator may not hold charge.",
-            "estimated_cost_range": "$160 - $350"
+            "safety_warning": "If jump-started, keep the vehicle running and drive straight to a workshop; turning off the ignition may leave you stranded.",
+            "estimated_cost_range": "₹4,200 - ₹7,900"
         }
 
-    if any(k in all_text for k in ['overheat', 'temperature', 'coolant', 'radiator', 'steam']):
+    if any(k in all_text for k in ['overheat', 'temperature', 'coolant', 'radiator', 'steam', 'hot']):
         return {
             "issue_title": "Engine Cooling System Malfunction",
-            "summary": "The cooling loop is unable to dissipate combustion thermal loads, leading to rapid coolant temperature elevation.",
+            "summary": "The cooling circuit is unable to dissipate combustion heat loads, creating rapid coolant boiling and excessive internal cylinder head pressure.",
             "severity": "CRITICAL",
             "probable_causes": [
-                "Coolant loss due to radiator hose leak or water pump seal failure",
-                "Stuck-closed mechanical thermostat",
-                "Electric cooling fan relay or motor failure"
+                "Coolant leakage from radiator core, water pump weeping hole, or split hose",
+                "Mechanical thermostat stuck in the closed position",
+                "Electric cooling fan motor or temperature sensor switch failure"
             ],
             "recommended_services": [
-                {"name": "Cooling System Pressure Test", "estimated_cost": "$80 - $120", "urgency": "Immediate"},
-                {"name": "Thermostat & Coolant Flush", "estimated_cost": "$180 - $260", "urgency": "Immediate"},
-                {"name": "Water Pump Replacement (if leaking)", "estimated_cost": "$350 - $650", "urgency": "Immediate"}
+                {"name": "Cooling System Pressure Leak Test", "estimated_cost": "₹650 - ₹1,100", "urgency": "Immediate"},
+                {"name": "Thermostat Replacement & Coolant Flush", "estimated_cost": "₹1,800 - ₹2,900", "urgency": "Immediate"},
+                {"name": "Water Pump Replacement (if leaking)", "estimated_cost": "₹3,200 - ₹5,800", "urgency": "Immediate"}
             ],
-            "safety_warning": "CRITICAL: Never remove radiator cap while hot! Continued driving will warp cylinder heads.",
-            "estimated_cost_range": "$260 - $770"
+            "safety_warning": "DANGER: Never remove the radiator cap while the engine is hot. Continued driving will warp cylinder heads and blow the head gasket.",
+            "estimated_cost_range": "₹2,450 - ₹9,800"
+        }
+
+    # AC / Air conditioning
+    if any(k in all_text for k in ['ac', 'air conditioning', 'cooling', 'blows warm', 'compressor']):
+        return {
+            "issue_title": "Automotive Air Conditioning Circuit Failure",
+            "summary": "The climate control loop has lost refrigerant pressure or the compressor magnetic clutch is not cycling to compress R134a/R1234yf gas.",
+            "severity": "LOW",
+            "probable_causes": [
+                "Refrigerant leak from O-rings, condenser fins, or evaporator core",
+                "Compressor magnetic clutch coil failure or relay fault",
+                "Clogged cabin pollen filter restricting blower airflow"
+            ],
+            "recommended_services": [
+                {"name": "AC Gas Vacuum Testing & R134a Refrigerant Top-up", "estimated_cost": "₹1,400 - ₹2,200", "urgency": "Soon"},
+                {"name": "Cabin Air Filter Replacement", "estimated_cost": "₹450 - ₹750", "urgency": "Routine"},
+                {"name": "AC Compressor & Condenser Inspection", "estimated_cost": "₹800 - ₹1,400", "urgency": "Soon"}
+            ],
+            "safety_warning": "Driving without AC is safe, but ensure windows are cracked in hot weather to prevent cabin heat exhaustion.",
+            "estimated_cost_range": "₹1,850 - ₹4,350"
         }
 
     # Generic automotive diagnostic fallback
@@ -241,14 +271,14 @@ Respond ONLY with a valid JSON object matching this schema:
         "summary": "Based on reported mechanical symptoms, an in-person physical inspection on a service lift is required to inspect clearances, bushings, and OBD-II pending trouble codes.",
         "severity": "MEDIUM",
         "probable_causes": [
-            "Normal component fatigue and service interval wear",
-            "Sensor calibration deviation or vacuum leak",
-            "Suspension or drivetrain mechanical play"
+            "Normal mechanical fatigue and service interval wear",
+            "Sensor calibration deviation or vacuum hose leak",
+            "Suspension bushing or drivetrain mechanical play"
         ],
         "recommended_services": [
-            {"name": "Comprehensive Multi-Point Inspection & OBD-II Scan", "estimated_cost": "$90 - $150", "urgency": "Soon"},
-            {"name": "Preventative Fluid & Filter Service", "estimated_cost": "$120 - $200", "urgency": "Routine"}
+            {"name": "Comprehensive Multi-Point Inspection & OBD-II Diagnostic Scan", "estimated_cost": "₹600 - ₹1,200", "urgency": "Soon"},
+            {"name": "Preventative Fluid & Filter Service", "estimated_cost": "₹1,500 - ₹2,800", "urgency": "Routine"}
         ],
-        "safety_warning": "Monitor dashboard warning indicators closely and avoid aggressive acceleration.",
-        "estimated_cost_range": "$90 - $350"
+        "safety_warning": "Monitor dashboard warning indicators closely and avoid aggressive acceleration until inspected.",
+        "estimated_cost_range": "₹600 - ₹4,000"
     }

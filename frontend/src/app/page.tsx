@@ -58,9 +58,9 @@ export default function Home() {
         session: savedSession || '',
         sender: 'mechanic',
         message:
-          "G'day! I'm Mac, your virtual senior mechanic. What vehicle are you working on today?\n\n" +
+          "Hello! I'm Mac, your senior automotive technician. What car are you working on today?\n\n" +
           "Describe any unusual symptoms—grinding brakes, fluid leaks, no-start condition, or dashboard warnings. " +
-          "You can also upload photos or record engine audio directly.",
+          "You can also upload photos, record engine sound, or attach a video clip anytime.",
         is_ai_generated: false,
         created_at: new Date().toISOString(),
       },
