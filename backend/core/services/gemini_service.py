@@ -29,9 +29,38 @@ def get_gemini_client():
         return None
 
 
+AVAILABLE_MODELS = [
+    'gemini-3.6-flash',
+    'gemini-flash-latest',
+    'gemini-3.8-flash',
+    'gemini-3.5-flash',
+]
+
+
+def generate_content_with_retry(client, contents):
+    """
+    Attempts content generation across verified active Gemini models in order.
+    Returns response text on success, or None if all models fail.
+    """
+    last_err = None
+    for model_name in AVAILABLE_MODELS:
+        try:
+            model = client.GenerativeModel(model_name)
+            response = model.generate_content(contents)
+            if response and response.text:
+                return response.text.strip()
+        except Exception as e:
+            last_err = e
+            logger.warning(f"Gemini model {model_name} failed: {e}")
+            continue
+    if last_err:
+        logger.error(f"All Gemini models failed. Last error: {last_err}")
+    return None
+
+
 def get_model(client):
-    """Try available flash and pro models."""
-    for model_name in ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-pro']:
+    """Compatibility helper returning primary active generative model."""
+    for model_name in AVAILABLE_MODELS:
         try:
             return client.GenerativeModel(model_name)
         except Exception:
@@ -48,11 +77,11 @@ def chat_with_gemini(conversation_history: list, current_message: str, vehicle_i
     if not client:
         return (
             f"Based on what you're describing with {vehicle_info or 'your vehicle'}, this symptom points towards an issue "
-            "with mechanical clearances, vacuum integrity, or electrical circuit continuity.\n\n"
+            "with mechanical clearances, cooling/vacuum integrity, or electrical circuit continuity.\n\n"
             "To narrow it down:\n"
             "• Does this happen mainly on cold starts or once the engine has warmed up to normal operating temperature?\n"
-            "• Have you noticed any dashboard warning indicators (like Check Engine, ABS, or Battery lights)?\n\n"
-            "If you can snap a photo or record the sound of the engine running, attach it here and I'll analyze it."
+            "• Have you noticed any dashboard warning indicators (like Check Engine, Temperature, or Battery lights)?\n\n"
+            "Feel free to attach a photo or record the engine sound anytime for visual/acoustic analysis."
         )
 
     system_instruction = (
@@ -60,9 +89,10 @@ def chat_with_gemini(conversation_history: list, current_message: str, vehicle_i
         "Your role is strictly automotive diagnostics and vehicle repair advice. "
         "Actively listen to what the customer says and respond dynamically—NEVER repeat generic or canned troubleshooting checklists. "
         "Directly answer their specific question or symptom with deep mechanical insight. "
-        "Explain what components could be failing (e.g. worn bushings, glazed pads, alternator diode, vacuum leak, solenoid, etc.), "
-        "why it happens, and what physical test or inspection they should perform. "
-        "Highlight safety implications (such as brake failures, overheating, steering play, or fuel leaks). "
+        "If they uploaded an inspection photo or mentioned smoke, overheating, or strange noises, directly analyze those specific symptoms. "
+        "Explain what components could be failing (e.g. blown head gasket, oil leaking from valve cover onto exhaust manifold, radiator core leak, thermostat stuck closed, worn bushings, alternator diode, etc.), "
+        "why it happens, and what physical test or inspection they should perform next. "
+        "Highlight safety implications (such as engine warping from overheating, brake failure, or fire hazards). "
         "Keep the response engaging, informative, and formatted with clean bullet points where helpful. "
         "Do not answer off-topic non-car questions. When discussing costs, use Indian Rupee (INR / ₹) currency."
     )
@@ -73,7 +103,7 @@ def chat_with_gemini(conversation_history: list, current_message: str, vehicle_i
 
     if conversation_history:
         prompt += "Previous Discussion Context:\n"
-        for msg in conversation_history[-6:]:
+        for msg in conversation_history[-8:]:
             role = "Technician" if msg.get('sender') == 'mechanic' else "Customer"
             prompt += f"{role}: {msg.get('message', '')}\n"
         prompt += "\n"
@@ -81,24 +111,19 @@ def chat_with_gemini(conversation_history: list, current_message: str, vehicle_i
     prompt += f"Customer's Current Message: {current_message}\n"
     prompt += "Technician (Respond directly to what they said, explain the exact mechanical cause, and advise next steps):"
 
-    try:
-        model = get_model(client)
-        if model:
-            response = model.generate_content(prompt)
-            if response and response.text:
-                return response.text.strip()
-    except Exception as e:
-        logger.info(f"Gemini API chat call skipped/failed ({e}). Using expert mechanic heuristic.")
-        
+    reply = generate_content_with_retry(client, prompt)
+    if reply:
+        return reply
+
     return (
         f"Understood. For {vehicle_info or 'this vehicle'}, this symptom usually stems from either a sensor calibration error, "
-        "a mechanical vacuum leak, or component fatigue under load.\n\n"
+        "a mechanical cooling/vacuum issue, or component fatigue under operating temperature.\n\n"
         "Could you let me know if this happens more during acceleration, idling, or under braking? "
-        "Uploading an engine sound clip or photo of the bay will help me give you an exact assessment."
+        "Click 'Generate Full Diagnostic Report (₹)' anytime for estimated repair costs."
     )
 
 
-def analyze_multimodal_media(file_path: str, file_type: str, user_prompt: str = "") -> str:
+def analyze_multimodal_media(file_path: str, file_type: str, user_prompt: str = "", vehicle_info: str = "") -> str:
     """
     Inspects image, audio, or video files for mechanical faults using Gemini Multimodal.
     """
@@ -112,31 +137,41 @@ def analyze_multimodal_media(file_path: str, file_type: str, user_prompt: str = 
         )
 
     try:
-        model = get_model(client)
-        if model:
-            technician_prompt = (
-                "You are an ASE Master Certified mechanic inspecting an uploaded automotive media diagnostic file. "
-                "Analyze what you observe: identify the automotive component, look for signs of wear, hairline cracks, "
-                "scoring, fluid leaks/discoloration, warning indicators, or abnormal acoustic frequency (knocks, squeals, rattles). "
-                "Give a comprehensive, 3-4 sentence professional mechanic assessment, explain the potential mechanical failure, "
-                "and clearly state what physical inspection step the technician should perform next. Use INR (₹) if discussing repairs."
-            )
+        vehicle_context = f"Vehicle: {vehicle_info}\n" if vehicle_info else ""
+        technician_prompt = (
+            "You are Mac, an ASE Master Certified senior automotive technician inspecting an uploaded customer diagnostic file.\n"
+            f"{vehicle_context}"
+            "Directly analyze what you observe in the image/media:\n"
+            "- If smoke or steam is visible in the engine bay: Identify the exact likely source (e.g. valve cover gasket oil leak dripping onto exhaust manifold, blown head gasket with burning coolant, ruptured radiator hose, or overheating cooling system). Explain the color/characteristics of the smoke (white sweet-smelling steam vs blue/grey acrid oil smoke) and the urgency.\n"
+            "- If other mechanical components: Inspect for wear, scoring, hairline cracks, fluid leaks/discoloration, belt fraying, or abnormal wear patterns.\n"
+            "- Provide a thorough, professional 3-5 sentence mechanic assessment explaining the potential failure.\n"
+            "- Clearly state the immediate safety and inspection steps (e.g., turn off engine immediately to prevent cylinder head warpage, do not open hot radiator cap, check coolant/oil dipstick once cooled).\n"
+            "- Use INR (₹) if discussing repairs."
+        )
 
-            if file_type == 'image':
-                img = Image.open(file_path)
-                response = model.generate_content([technician_prompt, img, user_prompt or "Inspect this vehicle component photo."])
-                return response.text.strip()
-                
-            elif file_type in ['audio', 'video']:
-                uploaded_file = client.upload_file(path=file_path)
-                response = model.generate_content([technician_prompt, uploaded_file, user_prompt or f"Analyze this automotive {file_type} recording."])
-                return response.text.strip()
+        if file_type == 'image':
+            img = Image.open(file_path)
+            reply = generate_content_with_retry(
+                client,
+                [technician_prompt, img, user_prompt or "Inspect this vehicle component photo and diagnose the visible issue in detail."]
+            )
+            if reply:
+                return reply
+
+        elif file_type in ['audio', 'video']:
+            uploaded_file = client.upload_file(path=file_path)
+            reply = generate_content_with_retry(
+                client,
+                [technician_prompt, uploaded_file, user_prompt or f"Analyze this automotive {file_type} recording in detail."]
+            )
+            if reply:
+                return reply
 
     except Exception as e:
-        logger.warning(f"Multimodal inspection error: {e}")
+        logger.error(f"Multimodal inspection error: {e}", exc_info=True)
 
     return (
-        f"Inspected the uploaded {file_type}. The diagnostic visual/audio evidence has been recorded in your session.\n\n"
+        f"Inspected the uploaded {file_type}. The diagnostic visual evidence has been recorded in your session.\n\n"
         "To pinpoint the exact mechanical failure, tell me if this symptom changes with vehicle speed, engine temperature, or steering angle."
     )
 
@@ -172,10 +207,8 @@ Respond ONLY with a valid JSON object matching this schema:
 }}
 """
         try:
-            model = get_model(client)
-            if model:
-                response = model.generate_content(prompt)
-                text = response.text.strip()
+            text = generate_content_with_retry(client, prompt)
+            if text:
                 if text.startswith('```json'):
                     text = text[7:]
                 if text.startswith('```'):

@@ -100,8 +100,12 @@ class ChatView(APIView):
         reply_text = ""
         is_ai = False
 
-        # Strategy A: Check for simple greetings (0 AI Tokens)
-        if is_greeting(user_text):
+        prior_messages_query = session.messages.exclude(id=user_message_obj.id)
+        has_prior_history = prior_messages_query.exists()
+        has_session_media = session.media_uploads.exists() or bool(media_obj)
+
+        # Strategy A: Check for simple greetings on initial turn (0 AI Tokens)
+        if is_greeting(user_text) and not has_prior_history and not media_obj:
             reply_text = get_mechanic_greeting()
             is_ai = False
 
@@ -115,28 +119,40 @@ class ChatView(APIView):
             reply_text = analyze_multimodal_media(
                 media_obj.file.path,
                 media_obj.file_type,
-                user_text
+                user_text,
+                vehicle_str
             )
             media_obj.ai_analysis = reply_text
             media_obj.save()
             is_ai = True
 
-        # Strategy D: Automotive Mechanical Query (Dynamic AI with Rule Fallback)
-        elif is_automotive(user_text):
+        # Strategy D: Automotive Mechanical Query or Active Session Follow-up
+        elif is_automotive(user_text) or has_prior_history or has_session_media:
             client = get_gemini_client()
             prior_messages = list(
-                session.messages.exclude(id=user_message_obj.id).values('sender', 'message')[:8]
+                prior_messages_query.values('sender', 'message')[:10]
             )
+
+            # Include uploaded media summary if available
+            media_notes = []
+            for m in session.media_uploads.exclude(ai_analysis=''):
+                if m.ai_analysis:
+                    media_notes.append(f"[Uploaded {m.file_type} analysis: {m.ai_analysis[:180]}...]")
+            
+            enhanced_user_text = user_text
+            if media_notes:
+                context_prefix = "\n".join(media_notes) + "\n"
+                enhanced_user_text = f"{context_prefix}{user_text}"
 
             # If Gemini is configured, provide dynamic, nuanced mechanic troubleshooting
             if client:
-                reply_text = chat_with_gemini(prior_messages, user_text, vehicle_str)
+                reply_text = chat_with_gemini(prior_messages, enhanced_user_text, vehicle_str)
                 is_ai = True
             else:
                 # If Gemini is offline/unconfigured, use deterministic decision tree
                 rule_followup = generate_rule_based_followup(user_text, {
                     'vehicle': vehicle_str,
-                    'has_media': bool(media_obj)
+                    'has_media': bool(media_obj) or has_session_media
                 })
                 if rule_followup and not prior_messages:
                     reply_text = rule_followup
@@ -149,7 +165,7 @@ class ChatView(APIView):
                     )
                 is_ai = False
         else:
-            # Ambiguous query - prompt user for car context (0 AI tokens)
+            # Ambiguous initial query in brand-new session - prompt user for car context (0 AI tokens)
             reply_text = (
                 "Could you specify how this relates to your car's symptoms or maintenance? "
                 "I want to make sure I give you accurate mechanical advice."

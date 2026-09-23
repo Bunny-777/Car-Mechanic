@@ -26,7 +26,20 @@ AUTOMOTIVE_KEYWORDS = {
     'sluggish', 'misfire', 'misfiring', 'backfire', 'leak', 'leaking', 'puddle', 'fluid',
     'no crank', 'cranking', 'dead battery', 'jump start', 'limp mode', 'rough idle', 'idling',
     'spongy', 'soft pedal', 'hard pedal', 'burning smell', 'sweet smell', 'gas smell', 'odour',
-    'mileage', 'mpg', 'service', 'maintenance', 'tune up', 'inspection', 'diagnostic'
+    'mileage', 'mpg', 'service', 'maintenance', 'tune up', 'inspection', 'diagnostic',
+
+    # Driving conditions & operating states
+    'speed', 'speeding', 'highway', 'idle', 'idling', 'accelerate', 'acceleration', 'accelerating',
+    'braking', 'turning', 'steer', 'steering', 'stopping', 'crank', 'cranking', 'drive', 'driving',
+    'shift', 'shifting', 'gear', 'reverse', 'park', 'neutral', 'load',
+
+    # Thermal & environmental symptoms
+    'temperature', 'temprature', 'temp', 'hot', 'cold', 'warm', 'heat', 'steam', 'vapor',
+    'fumes', 'smell', 'odor', 'burnt', 'burning', 'boil', 'boiling', 'coolant', 'radiator',
+
+    # Media, visual & diagnostic references
+    'photo', 'image', 'picture', 'pic', 'clip', 'video', 'bay', 'hood', 'bonnet', 'sound',
+    'noise', 'audio', 'meter', 'gauge', 'indicator', 'light', 'needle', 'leak', 'uploaded'
 }
 
 CAR_MAKES = {
