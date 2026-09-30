@@ -10,7 +10,7 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Groq client (primary AI -- generous free tier)
+# Groq client (PRIMARY for text -- ultra-fast inference)
 # ---------------------------------------------------------------------------
 try:
     from groq import Groq
@@ -18,11 +18,18 @@ try:
 except ImportError:
     GROQ_AVAILABLE = False
 
-# Verified working models on this Groq account
-GROQ_MODELS = [
-    'qwen/qwen3.8-27b',
-    'openai/gpt-oss-120b',
-    'openai/gpt-oss-20b',
+# Models verified against this Groq account via GET /openai/v1/models
+# Text models (ordered: best quality -> fastest fallback)
+GROQ_TEXT_MODELS = [
+    'openai/gpt-oss-120b',   # High-quality, fast on Groq hardware
+    'openai/gpt-oss-20b',    # Faster, lighter -- fallback if 120b hits limits
+    'qwen/qwen3.8-27b',      # Multimodal, also handles text -- last resort
+]
+
+# Vision-capable Groq models (for image fallback)
+GROQ_VISION_MODELS = [
+    'qwen/qwen3.8-27b',      # Verified vision-capable on this account
+    'openai/gpt-oss-120b',   # Vision fallback
 ]
 
 
@@ -37,10 +44,11 @@ def get_groq_client():
         return None
 
 
-def groq_generate(client, system_prompt, user_prompt):
+def groq_generate(client, system_prompt, user_prompt, model_list=None):
     """Try each Groq model in order; return text or None."""
+    models = model_list or GROQ_TEXT_MODELS
     last_err = None
-    for model_name in GROQ_MODELS:
+    for model_name in models:
         try:
             response = client.chat.completions.create(
                 model=model_name,
@@ -53,6 +61,7 @@ def groq_generate(client, system_prompt, user_prompt):
             )
             text = response.choices[0].message.content
             if text:
+                logger.info(f"Groq responded using model: {model_name}")
                 return text.strip()
         except Exception as e:
             last_err = e
@@ -63,7 +72,7 @@ def groq_generate(client, system_prompt, user_prompt):
 
 
 # ---------------------------------------------------------------------------
-# Gemini client (optional fallback)
+# Gemini client (PRIMARY for images, FALLBACK for text)
 # ---------------------------------------------------------------------------
 try:
     import google.generativeai as genai
@@ -103,23 +112,33 @@ def gemini_generate(client, prompt):
 
 
 # ---------------------------------------------------------------------------
-# Unified AI call -- Gemini first (better quality), Groq as fallback
+# Routing strategy:
+#   Text / Diagnosis  → Groq first (sub-second), Gemini as fallback
+#   Images            → Gemini only  (best multimodal quality)
+#   Audio / Video     → Gemini only  (Groq has no audio/video support)
 # ---------------------------------------------------------------------------
-def ai_generate(system_prompt, user_prompt):
-    """Tries Gemini first, then Groq. Returns None if both unavailable."""
+def ai_generate_text(system_prompt, user_prompt):
+    """For text-only tasks: Groq first (fast), Gemini as fallback."""
+    # 1. Try Groq (primary -- ultra-fast inference)
+    groq_client = get_groq_client()
+    if groq_client:
+        result = groq_generate(groq_client, system_prompt, user_prompt, GROQ_TEXT_MODELS)
+        if result:
+            return result
+
+    # 2. Fallback to Gemini
     gemini_client = get_gemini_client()
     if gemini_client:
         result = gemini_generate(gemini_client, f"{system_prompt}\n\n{user_prompt}")
         if result:
             return result
 
-    groq_client = get_groq_client()
-    if groq_client:
-        result = groq_generate(groq_client, system_prompt, user_prompt)
-        if result:
-            return result
-
     return None
+
+
+# Keep backward-compat alias (used by synthesize_diagnosis)
+def ai_generate(system_prompt, user_prompt):
+    return ai_generate_text(system_prompt, user_prompt)
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +172,8 @@ def chat_with_gemini(conversation_history: list, current_message: str, vehicle_i
 
     user_prompt += f"Customer: {current_message}\nMechanic (short, direct reply):"
 
-    result = ai_generate(system_prompt, user_prompt)
+    # Use Groq-first routing (fast) for text chat
+    result = ai_generate_text(system_prompt, user_prompt)
     if result:
         return result
 
@@ -166,8 +186,8 @@ def chat_with_gemini(conversation_history: list, current_message: str, vehicle_i
 def analyze_multimodal_media(file_path: str, file_type: str, user_prompt: str = "", vehicle_info: str = "") -> str:
     """
     Inspects image/audio/video files for mechanical faults.
-    Images: Groq vision (base64) first, Gemini as fallback.
-    Audio/video: Gemini only.
+    Images: Gemini multimodal (primary -- best quality), Groq vision via base64 (fallback).
+    Audio/video: Gemini only (Groq has no audio/video support).
     """
     if not os.path.exists(file_path):
         return f"Got your {file_type}. Tell me exactly where on the vehicle this is from and I will diagnose it."
@@ -209,7 +229,7 @@ def analyze_multimodal_media(file_path: str, file_type: str, user_prompt: str = 
                 b64 = base64.b64encode(buf.getvalue()).decode()
                 data_uri = f"data:image/jpeg;base64,{b64}"
 
-                for model_name in GROQ_MODELS:
+                for model_name in GROQ_VISION_MODELS:
                     try:
                         response = groq_client.chat.completions.create(
                             model=model_name,
