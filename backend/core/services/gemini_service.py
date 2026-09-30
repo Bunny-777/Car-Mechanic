@@ -329,10 +329,215 @@ def synthesize_diagnosis(vehicle_info: str, symptoms: list, messages: list) -> d
             if start != -1 and end > start:
                 clean = clean[start:end]
             data = json.loads(clean.strip())
+            data['ai_generated'] = True
             return data
         except json.JSONDecodeError as e:
             logger.warning(f"AI returned invalid JSON: {e}. Raw: {text[:400]}")
 
-    raise RuntimeError(
-        "AI diagnostic engine is temporarily unavailable. Please try again in a moment."
-    )
+    logger.info("AI unavailable or rate-limited; utilizing deterministic rule-based diagnostic fallback.")
+    return generate_fallback_diagnosis(vehicle_info, symptoms, messages)
+
+
+def generate_fallback_diagnosis(vehicle_info: str, symptoms: list, messages: list) -> dict:
+    # ── CRITICAL FIX: Only read USER messages, NOT mechanic replies ──
+    # Mechanic replies contain generic automotive words (brake, squeal, etc.)
+    # which would cause false-positive keyword matches.
+    user_messages = [m.get('message', '') for m in messages if m.get('sender') == 'user']
+    all_text = " ".join(user_messages + (symptoms or [])).lower()
+
+    # ── Horn / Electrical accessories ──
+    if any(k in all_text for k in ['horn', 'honk', 'beep', 'klaxon']):
+        return {
+            "issue_title": "Horn & Electrical Accessory Failure",
+            "summary": "The horn circuit is not completing, which can be caused by a blown fuse, a faulty horn relay, a defective steering clock spring, or a failed horn unit itself.",
+            "severity": "LOW",
+            "probable_causes": [
+                "Horn fuse blown in the engine-bay fuse box",
+                "Horn relay failure — relay not energising the horn circuit",
+                "Steering clock spring (spiral cable) broken, causing an open circuit to the horn pad",
+                "Horn unit itself internally failed or corroded contacts"
+            ],
+            "recommended_services": [
+                {"name": "Horn Fuse & Relay Inspection + Replacement", "estimated_cost": "Rs.200 - Rs.500", "urgency": "Soon"},
+                {"name": "Steering Clock Spring Replacement", "estimated_cost": "Rs.1,800 - Rs.3,500", "urgency": "Soon"},
+                {"name": "Horn Unit Replacement", "estimated_cost": "Rs.400 - Rs.1,200", "urgency": "Routine"},
+            ],
+            "safety_warning": "A non-functioning horn is a road safety hazard and may fail a vehicle inspection. Get it fixed promptly.",
+            "estimated_cost_range": "Rs.200 - Rs.5,200",
+            "ai_generated": False
+        }
+
+    # ── Brakes ──
+    if any(k in all_text for k in ['brake', 'pad', 'rotor', 'caliper', 'squeal', 'grind']):
+        is_grind = 'grind' in all_text or 'scrape' in all_text
+        return {
+            "issue_title": "Brake Friction Material Depletion & Rotor Wear",
+            "summary": (
+                "Metal-to-metal contact detected — steel backing plate is scoring the rotor face creating irreversible heat spots."
+                if is_grind else
+                "Acoustic wear indicators have contacted the rotor surface, indicating pad thickness below 3 mm safety threshold."
+            ),
+            "severity": "CRITICAL" if is_grind else "HIGH",
+            "probable_causes": [
+                "Brake friction material worn beyond minimum safety threshold (<3 mm)",
+                "Brake rotor surface lateral runout (warpage) or circular grooving",
+                "Caliper slide pin lubrication breakdown causing uneven pad taper wear"
+            ],
+            "recommended_services": [
+                {"name": "Front Brake Pads & Rotors Replacement", "estimated_cost": "Rs.2,800 - Rs.4,800", "urgency": "Immediate" if is_grind else "Soon"},
+                {"name": "Brake Fluid Moisture Test & Flush (DOT 4)", "estimated_cost": "Rs.750 - Rs.1,200", "urgency": "Routine"}
+            ],
+            "safety_warning": (
+                "CRITICAL: Do not drive at highway speeds. Stopping distances are severely degraded."
+                if is_grind else
+                "Replace pads promptly to prevent irreversible scoring to the brake discs."
+            ),
+            "estimated_cost_range": "Rs.2,800 - Rs.6,000",
+            "ai_generated": False
+        }
+
+    # ── Engine / Starting / Battery ──
+    if any(k in all_text for k in ['battery', 'alternator', 'click', 'crank', "won't start", "not start", 'dead']):
+        return {
+            "issue_title": "Electrical Starting Circuit & Battery Failure",
+            "summary": "The vehicle electrical system has inadequate cranking voltage or a failed charging circuit, preventing the starter motor from turning the crankshaft.",
+            "severity": "MEDIUM",
+            "probable_causes": [
+                "12V Lead-acid battery internal cell sulfation or end-of-life (>3 years old)",
+                "Alternator diode failure or worn brushes providing <13.5V under load",
+                "Corroded lead battery terminals causing high electrical resistance"
+            ],
+            "recommended_services": [
+                {"name": "12V Automotive Battery Replacement (Exide / Amaron)", "estimated_cost": "Rs.4,200 - Rs.6,500", "urgency": "Immediate"},
+                {"name": "Battery Terminal Cleaning & Anti-Corrosion Treatment", "estimated_cost": "Rs.250 - Rs.450", "urgency": "Immediate"},
+                {"name": "Alternator Output & Starter Draw Diagnostic", "estimated_cost": "Rs.600 - Rs.950", "urgency": "Soon"}
+            ],
+            "safety_warning": "If jump-started, keep the vehicle running and drive straight to a workshop.",
+            "estimated_cost_range": "Rs.4,200 - Rs.7,900",
+            "ai_generated": False
+        }
+
+    # ── Overheating / Cooling ──
+    if any(k in all_text for k in ['overheat', 'temperature', 'coolant', 'radiator', 'steam', 'hot']):
+        return {
+            "issue_title": "Engine Cooling System Malfunction",
+            "summary": "The cooling circuit cannot dissipate combustion heat, causing coolant to boil and building excessive cylinder-head pressure.",
+            "severity": "CRITICAL",
+            "probable_causes": [
+                "Coolant leakage from radiator core, water pump weeping hole, or split hose",
+                "Mechanical thermostat stuck in the closed position",
+                "Electric cooling fan motor or temperature sensor switch failure"
+            ],
+            "recommended_services": [
+                {"name": "Cooling System Pressure Leak Test", "estimated_cost": "Rs.650 - Rs.1,100", "urgency": "Immediate"},
+                {"name": "Thermostat Replacement & Coolant Flush", "estimated_cost": "Rs.1,800 - Rs.2,900", "urgency": "Immediate"},
+                {"name": "Water Pump Replacement (if leaking)", "estimated_cost": "Rs.3,200 - Rs.5,800", "urgency": "Immediate"}
+            ],
+            "safety_warning": "DANGER: Never remove the radiator cap while the engine is hot. Continued driving will warp cylinder heads.",
+            "estimated_cost_range": "Rs.2,450 - Rs.9,800",
+            "ai_generated": False
+        }
+
+    # ── AC / Climate ──
+    if any(k in all_text for k in ['ac', 'air condition', 'cooling', 'blows warm', 'compressor', 'cold air', 'not cool']):
+        return {
+            "issue_title": "Automotive Air Conditioning Circuit Failure",
+            "summary": "The climate control loop has lost refrigerant pressure or the compressor magnetic clutch is not engaging.",
+            "severity": "LOW",
+            "probable_causes": [
+                "Refrigerant leak from O-rings, condenser fins, or evaporator core",
+                "Compressor magnetic clutch coil failure or relay fault",
+                "Clogged cabin pollen filter restricting blower airflow"
+            ],
+            "recommended_services": [
+                {"name": "AC Gas Vacuum Testing & R134a Refrigerant Top-up", "estimated_cost": "Rs.1,400 - Rs.2,200", "urgency": "Soon"},
+                {"name": "Cabin Air Filter Replacement", "estimated_cost": "Rs.450 - Rs.750", "urgency": "Routine"},
+                {"name": "AC Compressor & Condenser Inspection", "estimated_cost": "Rs.800 - Rs.1,400", "urgency": "Soon"}
+            ],
+            "safety_warning": "Driving without AC is safe but ensure windows are opened in extreme heat.",
+            "estimated_cost_range": "Rs.1,850 - Rs.4,350",
+            "ai_generated": False
+        }
+
+    # ── Lights / Headlights ──
+    if any(k in all_text for k in ['light', 'headlight', 'taillight', 'indicator', 'bulb', 'lamp']):
+        return {
+            "issue_title": "Lighting Circuit Failure",
+            "summary": "One or more lighting circuits have failed, which may be caused by a blown bulb, blown fuse, bad relay, or a wiring fault.",
+            "severity": "MEDIUM",
+            "probable_causes": [
+                "Bulb filament burnt out (tungsten halogen or LED failure)",
+                "Fuse blown in the lighting circuit",
+                "Relay or BCM (Body Control Module) controlling the lighting failed"
+            ],
+            "recommended_services": [
+                {"name": "Bulb Replacement (per unit)", "estimated_cost": "Rs.150 - Rs.800", "urgency": "Soon"},
+                {"name": "Lighting Fuse & Relay Inspection", "estimated_cost": "Rs.200 - Rs.500", "urgency": "Soon"},
+                {"name": "Wiring Harness Inspection", "estimated_cost": "Rs.800 - Rs.1,500", "urgency": "Routine"}
+            ],
+            "safety_warning": "Non-functional headlights or indicators are illegal and dangerous at night or in low visibility.",
+            "estimated_cost_range": "Rs.150 - Rs.2,800",
+            "ai_generated": False
+        }
+
+    # ── Oil / Engine smoke ──
+    if any(k in all_text for k in ['oil', 'smoke', 'burning smell', 'leak', 'drip', 'engine light', 'check engine']):
+        return {
+            "issue_title": "Engine Oil System & Emission Fault",
+            "summary": "The engine is showing signs of oil consumption, leakage, or combustion of oil — indicating worn seals, gaskets, or piston rings.",
+            "severity": "HIGH",
+            "probable_causes": [
+                "Valve stem seals or piston rings worn — oil entering combustion chamber",
+                "Rocker cover / sump gasket leak onto hot exhaust manifold",
+                "PCV (Positive Crankcase Ventilation) valve clogged causing pressure buildup"
+            ],
+            "recommended_services": [
+                {"name": "Engine Oil & Filter Change + Leak Inspection", "estimated_cost": "Rs.800 - Rs.1,800", "urgency": "Immediate"},
+                {"name": "Rocker Cover Gasket Replacement", "estimated_cost": "Rs.1,200 - Rs.2,400", "urgency": "Soon"},
+                {"name": "PCV Valve Replacement", "estimated_cost": "Rs.400 - Rs.900", "urgency": "Soon"}
+            ],
+            "safety_warning": "Low engine oil can cause catastrophic engine seizure. Check oil level immediately and top up if needed.",
+            "estimated_cost_range": "Rs.800 - Rs.5,100",
+            "ai_generated": False
+        }
+
+    # ── Suspension / Steering / Vibration ──
+    if any(k in all_text for k in ['vibrat', 'shak', 'wobble', 'pull', 'steer', 'suspension', 'bump', 'shock', 'noise from wheel']):
+        return {
+            "issue_title": "Suspension & Steering System Wear",
+            "summary": "Vibration, pulling, or unusual road noise typically indicates worn suspension bushings, wheel balance issues, or degraded shock absorbers.",
+            "severity": "MEDIUM",
+            "probable_causes": [
+                "Wheel imbalance or tyre damage causing vibration at speed",
+                "Worn front strut or shock absorber top mount",
+                "Lower control arm bushings or ball joint excessive play"
+            ],
+            "recommended_services": [
+                {"name": "Wheel Balancing & Alignment", "estimated_cost": "Rs.400 - Rs.800", "urgency": "Soon"},
+                {"name": "Shock Absorber / Strut Inspection & Replacement", "estimated_cost": "Rs.2,500 - Rs.5,500", "urgency": "Soon"},
+                {"name": "Suspension Bushing Inspection", "estimated_cost": "Rs.600 - Rs.1,200", "urgency": "Routine"}
+            ],
+            "safety_warning": "Worn suspension reduces vehicle control, especially during emergency manoeuvres.",
+            "estimated_cost_range": "Rs.400 - Rs.7,500",
+            "ai_generated": False
+        }
+
+    # ── Generic fallback ──
+    return {
+        "issue_title": f"General Mechanical Diagnostic — {vehicle_info or 'Vehicle'}",
+        "summary": "Based on the reported symptoms, a comprehensive in-person inspection is recommended. The technician will inspect all relevant systems and run an OBD-II diagnostic scan.",
+        "severity": "MEDIUM",
+        "probable_causes": [
+            "Symptoms suggest a minor electrical or mechanical fault requiring physical inspection",
+            "Sensor calibration drift or vacuum hose micro-leak",
+            "Normal wear requiring scheduled service attention"
+        ],
+        "recommended_services": [
+            {"name": "Comprehensive Multi-Point Inspection & OBD-II Diagnostic Scan", "estimated_cost": "Rs.600 - Rs.1,200", "urgency": "Soon"},
+            {"name": "Preventative Fluid & Filter Service", "estimated_cost": "Rs.1,500 - Rs.2,800", "urgency": "Routine"}
+        ],
+        "safety_warning": "Monitor dashboard warning indicators closely and avoid aggressive acceleration until inspected.",
+        "estimated_cost_range": "Rs.600 - Rs.4,000",
+        "ai_generated": False
+    }
+
