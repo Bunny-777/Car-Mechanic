@@ -1,5 +1,22 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
+export type BackendStatus = 'checking' | 'online' | 'offline';
+
+export async function checkBackendHealth(): Promise<{ status: BackendStatus; latency?: number }> {
+  const start = Date.now();
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(`${API_BASE_URL}/`, { signal: controller.signal, cache: 'no-store' });
+    clearTimeout(timer);
+    const latency = Date.now() - start;
+    if (res.ok) return { status: 'online', latency };
+    return { status: 'offline', latency };
+  } catch {
+    return { status: 'offline', latency: Date.now() - start };
+  }
+}
+
 export interface UploadedMedia {
   id: string;
   file?: string;

@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { ShieldCheck, Car, Clock, RotateCcw, ChevronDown, Volume2, VolumeX, Sparkles, Fuel } from 'lucide-react';
-import { VehicleInfo } from '@/lib/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ShieldCheck, Car, Clock, RotateCcw, ChevronDown, Volume2, VolumeX, Sparkles, Wifi, WifiOff } from 'lucide-react';
+import { VehicleInfo, checkBackendHealth, BackendStatus } from '@/lib/api';
 
 interface HeaderProps {
   vehicle: VehicleInfo;
@@ -30,6 +30,21 @@ export default function Header({
   onToggleVoice,
   onOpenObdLibrary,
 }: HeaderProps) {
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>('checking');
+  const [backendLatency, setBackendLatency] = useState<number | undefined>(undefined);
+
+  const pingBackend = useCallback(async () => {
+    const result = await checkBackendHealth();
+    setBackendStatus(result.status);
+    setBackendLatency(result.latency);
+  }, []);
+
+  useEffect(() => {
+    pingBackend();
+    const interval = setInterval(pingBackend, 30_000);
+    return () => clearInterval(interval);
+  }, [pingBackend]);
+
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [year, setYear] = useState(vehicle.year || '');
   const [make, setMake] = useState(vehicle.make || '');
@@ -95,6 +110,72 @@ export default function Header({
                 APEX <span style={{ color: 'var(--accent-cyan)' }}>DIAGNOSTICS</span>
               </h1>
               <div className="blue-pulse-dot" title="Virtual Master Tech Online" />
+
+              {/* ── Backend Status Pill ── */}
+              <button
+                onClick={pingBackend}
+                title={backendStatus === 'online'
+                  ? `API Online — ${backendLatency}ms latency. Click to recheck.`
+                  : backendStatus === 'checking'
+                  ? 'Checking backend connection…'
+                  : `API Offline — Cannot reach backend. Click to retry.`
+                }
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: 'var(--radius-full)',
+                  border: `1px solid ${
+                    backendStatus === 'online'
+                      ? 'rgba(52, 211, 153, 0.35)'
+                      : backendStatus === 'checking'
+                      ? 'rgba(251, 191, 36, 0.35)'
+                      : 'rgba(248, 113, 113, 0.4)'
+                  }`,
+                  background: backendStatus === 'online'
+                    ? 'rgba(52, 211, 153, 0.1)'
+                    : backendStatus === 'checking'
+                    ? 'rgba(251, 191, 36, 0.1)'
+                    : 'rgba(248, 113, 113, 0.12)',
+                  cursor: 'pointer',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.03em',
+                  color: backendStatus === 'online'
+                    ? '#6ee7b7'
+                    : backendStatus === 'checking'
+                    ? '#fde68a'
+                    : '#fca5a5',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {/* Pulsing dot */}
+                <span style={{
+                  display: 'inline-block',
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: backendStatus === 'online'
+                    ? '#34d399'
+                    : backendStatus === 'checking'
+                    ? '#fbbf24'
+                    : '#f87171',
+                  boxShadow: backendStatus === 'online'
+                    ? '0 0 6px 2px rgba(52, 211, 153, 0.6)'
+                    : backendStatus === 'checking'
+                    ? '0 0 6px 2px rgba(251, 191, 36, 0.6)'
+                    : '0 0 6px 2px rgba(248, 113, 113, 0.6)',
+                  animation: backendStatus === 'checking' ? 'pulse 1s ease-in-out infinite' : 'none',
+                }} />
+                {backendStatus === 'online'
+                  ? `API ${backendLatency}ms`
+                  : backendStatus === 'checking'
+                  ? 'Checking…'
+                  : 'API Offline'}
+                {backendStatus === 'offline' && <WifiOff size={10} />}
+                {backendStatus === 'online' && <Wifi size={10} style={{ opacity: 0.7 }} />}
+              </button>
             </div>
             <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <span>ASE Certified Master Diagnostic AI</span>

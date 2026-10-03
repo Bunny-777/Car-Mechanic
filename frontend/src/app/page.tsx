@@ -11,7 +11,7 @@ import {
 import {
   ChatMessage, UploadedMedia, Diagnosis, Booking,
   VehicleInfo, sendChatMessage, requestDiagnosis,
-  uploadMediaFile, createBooking
+  uploadMediaFile, createBooking, checkBackendHealth, BackendStatus
 } from '@/lib/api';
 
 /* ─── Quick-start chip definitions ─── */
@@ -357,6 +357,22 @@ export default function Home() {
   const audioChunksRef = useRef<Blob[]>([]);
   const diagnosingRef = useRef(false); // prevents double-trigger
 
+  /* ── Backend health state ── */
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>('checking');
+  const [backendLatency, setBackendLatency] = useState<number | undefined>(undefined);
+
+  const pingBackend = useCallback(async () => {
+    const result = await checkBackendHealth();
+    setBackendStatus(result.status);
+    setBackendLatency(result.latency);
+  }, []);
+
+  useEffect(() => {
+    pingBackend();
+    const id = setInterval(pingBackend, 30_000);
+    return () => clearInterval(id);
+  }, [pingBackend]);
+
   /* Welcome message */
   useEffect(() => {
     const saved = localStorage.getItem('apex_session_id');
@@ -537,7 +553,7 @@ export default function Home() {
         backdropFilter: 'blur(20px)',
         position: 'relative', zIndex: 100
       }}>
-        {/* Logo */}
+        {/* Logo + Backend Status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <div style={{
             width: 34, height: 34, borderRadius: 'var(--r-md)',
@@ -551,6 +567,60 @@ export default function Home() {
             <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.1 }}>Apex Mechanic</div>
             <div style={{ fontSize: '0.6rem', color: 'var(--amber)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>AI Automotive Diagnostics</div>
           </div>
+
+          {/* ── Backend Status Pill ── */}
+          <button
+            onClick={pingBackend}
+            title={
+              backendStatus === 'online'
+                ? `Backend Online — ${backendLatency}ms. Click to recheck.`
+                : backendStatus === 'checking'
+                ? 'Checking backend…'
+                : 'Backend Offline — Cannot reach API. Click to retry.'
+            }
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.3rem',
+              padding: '0.18rem 0.55rem',
+              borderRadius: '999px',
+              border: `1px solid ${
+                backendStatus === 'online'  ? 'rgba(52,211,153,0.35)'
+                : backendStatus === 'checking' ? 'rgba(251,191,36,0.35)'
+                : 'rgba(248,113,113,0.4)'
+              }`,
+              background:
+                backendStatus === 'online'  ? 'rgba(52,211,153,0.08)'
+                : backendStatus === 'checking' ? 'rgba(251,191,36,0.08)'
+                : 'rgba(248,113,113,0.1)',
+              cursor: 'pointer',
+              fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.04em',
+              color:
+                backendStatus === 'online'  ? '#6ee7b7'
+                : backendStatus === 'checking' ? '#fde68a'
+                : '#fca5a5',
+              textTransform: 'uppercase',
+              transition: 'all 0.2s',
+            }}
+          >
+            {/* Animated dot */}
+            <span style={{
+              display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+              background:
+                backendStatus === 'online'  ? '#34d399'
+                : backendStatus === 'checking' ? '#fbbf24'
+                : '#f87171',
+              boxShadow:
+                backendStatus === 'online'  ? '0 0 0 2px rgba(52,211,153,0.25)'
+                : backendStatus === 'checking' ? '0 0 0 2px rgba(251,191,36,0.25)'
+                : '0 0 0 2px rgba(248,113,113,0.25)',
+              animation:
+                backendStatus === 'online'  ? 'statusPulseGreen 2s ease-in-out infinite'
+                : backendStatus === 'checking' ? 'statusPulseYellow 1s ease-in-out infinite'
+                : 'statusPulseRed 1.5s ease-in-out infinite',
+            }} />
+            {backendStatus === 'online' ? `API ${backendLatency}ms`
+              : backendStatus === 'checking' ? 'Checking…'
+              : 'Offline'}
+          </button>
         </div>
 
         {/* Vehicle Badge + Actions */}
