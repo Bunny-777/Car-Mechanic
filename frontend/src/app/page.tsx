@@ -350,6 +350,7 @@ export default function Home() {
   const [showBooking, setShowBooking] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [showMobileIssues, setShowMobileIssues] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -547,25 +548,25 @@ export default function Home() {
       {/* ── TOP HEADER ── */}
       <header style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 1.25rem', height: 56, flexShrink: 0,
+        padding: '0 0.85rem', height: 56, flexShrink: 0,
         borderBottom: '1px solid var(--border-faint)',
         background: 'rgba(13,13,15,0.97)',
         backdropFilter: 'blur(20px)',
         position: 'relative', zIndex: 100
       }}>
         {/* Logo + Backend Status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <div style={{
-            width: 34, height: 34, borderRadius: 'var(--r-md)',
+            width: 32, height: 32, borderRadius: 'var(--r-md)', flexShrink: 0,
             background: 'linear-gradient(135deg, var(--amber-dim), var(--amber))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 0 14px var(--amber-glow)'
           }}>
-            <Wrench size={17} color="#0d0d0f" />
+            <Wrench size={16} color="#0d0d0f" />
           </div>
           <div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.1 }}>Apex Mechanic</div>
-            <div style={{ fontSize: '0.6rem', color: 'var(--amber)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>AI Automotive Diagnostics</div>
+            <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.1 }}>Apex Mechanic</div>
+            <div className="header-status-text" style={{ fontSize: '0.58rem', color: 'var(--amber)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>AI Automotive Diagnostics</div>
           </div>
 
           {/* ── Backend Status Pill ── */}
@@ -580,7 +581,7 @@ export default function Home() {
             }
             style={{
               display: 'flex', alignItems: 'center', gap: '0.3rem',
-              padding: '0.18rem 0.55rem',
+              padding: '0.18rem 0.45rem',
               borderRadius: '999px',
               border: `1px solid ${
                 backendStatus === 'online'  ? 'rgba(52,211,153,0.35)'
@@ -592,18 +593,20 @@ export default function Home() {
                 : backendStatus === 'checking' ? 'rgba(251,191,36,0.08)'
                 : 'rgba(248,113,113,0.1)',
               cursor: 'pointer',
-              fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.04em',
+              fontSize: '0.63rem', fontWeight: 700, letterSpacing: '0.04em',
               color:
                 backendStatus === 'online'  ? '#6ee7b7'
                 : backendStatus === 'checking' ? '#fde68a'
                 : '#fca5a5',
               textTransform: 'uppercase',
               transition: 'all 0.2s',
+              flexShrink: 0,
             }}
           >
             {/* Animated dot */}
             <span style={{
               display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+              flexShrink: 0,
               background:
                 backendStatus === 'online'  ? '#34d399'
                 : backendStatus === 'checking' ? '#fbbf24'
@@ -617,32 +620,35 @@ export default function Home() {
                 : backendStatus === 'checking' ? 'statusPulseYellow 1s ease-in-out infinite'
                 : 'statusPulseRed 1.5s ease-in-out infinite',
             }} />
-            {backendStatus === 'online' ? `API ${backendLatency}ms`
-              : backendStatus === 'checking' ? 'Checking…'
-              : 'Offline'}
+            <span className="backend-pill-label">
+              {backendStatus === 'online' ? `API ${backendLatency}ms`
+                : backendStatus === 'checking' ? 'Checking…'
+                : 'Offline'}
+            </span>
           </button>
         </div>
 
         {/* Vehicle Badge + Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
           {vehicleLabel ? (
             <div style={{
-              display: 'flex', alignItems: 'center', gap: '0.45rem',
-              padding: '0.3rem 0.8rem 0.3rem 0.6rem',
+              display: 'flex', alignItems: 'center', gap: '0.4rem',
+              padding: '0.28rem 0.7rem 0.28rem 0.5rem',
               background: 'var(--amber-subtle)',
               border: '1px solid var(--amber-border)',
               borderRadius: 'var(--r-full)',
             }}>
-              <Car size={13} color="var(--amber)" />
-              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--amber)' }}>{vehicleLabel}</span>
+              <Car size={12} color="var(--amber)" style={{ flexShrink: 0 }} />
+              <span className="vehicle-label-header" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--amber)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vehicleLabel}</span>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              <Car size={13} /><span>No vehicle detected yet</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              <Car size={12} style={{ flexShrink: 0 }} />
+              <span className="header-status-text">No vehicle detected</span>
             </div>
           )}
-          <button className="btn-icon" onClick={newSession} title="Start new session">
-            <RefreshCcw size={14} />
+          <button className="btn-icon" onClick={newSession} title="Start new session" style={{ width: 32, height: 32 }}>
+            <RefreshCcw size={13} />
           </button>
         </div>
       </header>
@@ -659,7 +665,7 @@ export default function Home() {
 
               {/* Quick-start chips */}
               {userMessages.length === 0 && (
-                <div className="glass animate-fade-in" style={{
+                <div className="glass animate-fade-in chips-grid" style={{
                   borderRadius: 'var(--r-xl)', padding: '1.1rem',
                   display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem',
                 }}>
@@ -696,7 +702,7 @@ export default function Home() {
                       {!isUser && <div className="amber-dot" style={{ width: 5, height: 5 }} />}
                       <span>{isUser ? 'You' : 'Mac — Technician'}</span>
                     </div>
-                    <div style={{
+                    <div className="msg-bubble" style={{
                       maxWidth: '82%',
                       padding: '0.75rem 1rem',
                       borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
@@ -764,29 +770,29 @@ export default function Home() {
                 </div>
               )}
               {/* Input row */}
-              <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
+              <div className="input-bar-row" style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
                 <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*" onChange={handleFileChange} style={{ display: 'none' }} />
-                <button className="btn-icon" onClick={() => fileInputRef.current?.click()} disabled={isSending || isUploading || isRecording} title="Upload photo or video" style={{ width: 34, height: 34 }}>
+                <button className="btn-icon" onClick={() => fileInputRef.current?.click()} disabled={isSending || isUploading || isRecording} title="Upload photo or video" style={{ width: 34, height: 34, flexShrink: 0 }}>
                   {isUploading ? <div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,0.12)', borderTopColor: 'var(--amber)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> : <Camera size={15} />}
                 </button>
-                <button className="btn-icon" onClick={toggleRecording} disabled={isSending || isUploading} title={isRecording ? 'Stop recording' : 'Record audio'} style={isRecording ? { width: 34, height: 34, borderColor: 'var(--sev-crit)', color: 'var(--sev-crit)', background: 'var(--sev-crit-bg)' } : { width: 34, height: 34 }}>
+                <button className="btn-icon" onClick={toggleRecording} disabled={isSending || isUploading} title={isRecording ? 'Stop recording' : 'Record audio'} style={isRecording ? { width: 34, height: 34, borderColor: 'var(--sev-crit)', color: 'var(--sev-crit)', background: 'var(--sev-crit-bg)', flexShrink: 0 } : { width: 34, height: 34, flexShrink: 0 }}>
                   {isRecording ? <MicOff size={15} /> : <Mic size={15} />}
                 </button>
                 <input
                   ref={inputRef} className="input"
-                  style={{ flex: 1, borderRadius: 'var(--r-full)', padding: '0.6rem 1.1rem', fontSize: '0.875rem' }}
+                  style={{ flex: 1, borderRadius: 'var(--r-full)', padding: '0.6rem 0.85rem', fontSize: '0.875rem', minWidth: 0 }}
                   value={inputText}
                   onChange={e => setInputText(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                  placeholder={attachedMedia ? 'Add context about this file...' : 'Describe your car problem...'}
+                  placeholder={attachedMedia ? 'Add context...' : 'Describe car problem...'}
                   disabled={isSending}
                 />
                 {canDiagnose && (
-                  <button className="btn-primary" onClick={generateDiagnosis} disabled={isDiagnosing}
+                  <button className="btn-primary diagnose-btn-mobile" onClick={generateDiagnosis} disabled={isDiagnosing}
                     style={{ padding: '0.55rem 0.85rem', fontSize: '0.78rem', whiteSpace: 'nowrap', flexShrink: 0 }}
                     title="Generate diagnosis with cost estimate">
                     {isDiagnosing ? <div style={{ width: 13, height: 13, border: '2px solid rgba(0,0,0,0.25)', borderTopColor: '#000', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> : <Sparkles size={13} />}
-                    {isDiagnosing ? 'Analysing...' : 'Diagnose'}
+                    <span className="diagnose-text">{isDiagnosing ? 'Analysing...' : 'Diagnose'}</span>
                   </button>
                 )}
                 <button onClick={() => sendMessage()} disabled={isSending || (!inputText.trim() && !attachedMedia)}
@@ -806,8 +812,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ── RIGHT: Issues Notepad Panel ── */}
-        <div style={{
+        {/* ── RIGHT: Issues Notepad Panel (desktop) ── */}
+        <div className="desktop-issues-panel" style={{
           width: 300, flexShrink: 0,
           borderLeft: '1px solid var(--border-faint)',
           background: 'var(--bg-surface)',
@@ -929,6 +935,102 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* ── MOBILE: Issues FAB ── */}
+      <button
+        className="mobile-fab"
+        onClick={() => setShowMobileIssues(true)}
+        aria-label="View Issues Tracker"
+      >
+        <ClipboardList size={15} />
+        Issues {diagnoses.length > 0 && `(${diagnoses.length})`}
+      </button>
+
+      {/* ── MOBILE: Issues Bottom Sheet ── */}
+      {showMobileIssues && (
+        <>
+          <div className="sidebar-backdrop" onClick={() => setShowMobileIssues(false)} />
+          <div className="issues-sheet">
+            <div className="issues-sheet-handle" />
+            {/* Sheet header */}
+            <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-faint)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 'var(--r-sm)', background: 'var(--amber-subtle)', border: '1px solid var(--amber-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--amber)', flexShrink: 0 }}>
+                <ClipboardList size={14} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>Issues Tracker</div>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{diagnoses.length} diagnosis{diagnoses.length !== 1 ? 'es' : ''} logged</div>
+              </div>
+              <button className="btn-icon" onClick={() => setShowMobileIssues(false)} style={{ width: 32, height: 32 }}><X size={14} /></button>
+            </div>
+            {/* Sheet body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0.65rem' }}>
+              {diagnoses.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '0.75rem', padding: '2rem 1rem', textAlign: 'center' }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 'var(--r-md)', background: 'var(--bg-elevated)', border: '1px solid var(--border-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)' }}>
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>No issues logged yet</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                      Describe your car problem and tap <strong style={{ color: 'var(--amber)' }}>Diagnose</strong> to log issues here.
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {diagnoses.map((diag, idx) => {
+                    const sev = SEV_MAP[diag.severity] || SEV_MAP.MEDIUM;
+                    return (
+                      <div key={diag.id} className="animate-slide-up" style={{
+                        background: 'var(--bg-elevated)', border: '1px solid var(--border-faint)',
+                        borderRadius: 'var(--r-md)', overflow: 'hidden',
+                      }}>
+                        <div style={{ height: 3, background: `linear-gradient(90deg, var(--amber), ${sev.color})` }} />
+                        <div style={{ padding: '0.7rem 0.75rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                            <span className={`badge ${sev.cls}`} style={{ fontSize: '0.62rem' }}>{sev.label}</span>
+                            <span style={{ fontSize: '0.62rem', color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>#{diagnoses.length - idx}</span>
+                          </div>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.35, marginBottom: '0.5rem' }}>{diag.issue_title}</div>
+                          <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                            <div>
+                              <div style={{ fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total Est.</div>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--amber)', fontFamily: 'var(--mono)' }}>{diag.estimated_cost_range}</div>
+                            </div>
+                            <button
+                              onClick={() => { setDiagSidebar(diag); setShowMobileIssues(false); }}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                                padding: '0.3rem 0.6rem',
+                                background: 'var(--amber-subtle)', border: '1px solid var(--amber-border)',
+                                borderRadius: 'var(--r-sm)', color: 'var(--amber)',
+                                fontSize: '0.68rem', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0
+                              }}
+                            >
+                              <FileText size={11} />Full Report
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {/* Sheet footer */}
+            {diagnoses.length > 0 && (
+              <div style={{ padding: '0.65rem', borderTop: '1px solid var(--border-faint)' }}>
+                <button className="btn-primary" style={{ width: '100%', padding: '0.6rem', fontSize: '0.8rem' }}
+                  onClick={() => { setBookingDiag(diagnoses[0]); setShowBooking(true); setShowMobileIssues(false); }}>
+                  <CalendarDays size={14} />
+                  Book a Mechanic
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* ── DIAGNOSTIC DETAIL SIDEBAR ── */}
       {diagSidebar && (
