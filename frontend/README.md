@@ -1,8 +1,21 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Apex Mechanic AI — Frontend
+This is the Next.js 16 frontend for the Apex Car Mechanic AI diagnostic platform.
+
+## Live Deployments
+- **Production Website (Custom Domain)**: [https://car-mechanic.bunny777.me](https://car-mechanic.bunny777.me)
+- **Vercel Default URL**: [https://car-mechanic-blond.vercel.app](https://car-mechanic-blond.vercel.app)
+- **Production Backend API**: [https://api.bunny777.me](https://api.bunny777.me) (AWS EC2 + Cloudflare HTTPS)
 
 ## Getting Started
 
-First, run the development server:
+First, configure your `.env.local`:
+```env
+NEXT_PUBLIC_API_URL=https://api.bunny777.me
+# Or for local development:
+# NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+```
+
+Then run the development server:
 
 ```bash
 npm run dev

@@ -6,8 +6,10 @@ A full-stack automotive diagnostic platform where vehicle owners troubleshoot me
 
 ## Live Links
 
-- **Live Frontend (Vercel)**: [https://apex-car-bot.vercel.app](https://apex-car-bot.vercel.app)
-- **Live Backend API (Render)**: [https://car-mechanic.onrender.com](https://car-mechanic.onrender.com)
+- **Live Frontend (Custom Domain)**: [https://car-mechanic.bunny777.me](https://car-mechanic.bunny777.me)
+- **Live Frontend (Vercel)**: [https://car-mechanic-blond.vercel.app](https://car-mechanic-blond.vercel.app)
+- **Live Backend API (Cloudflare HTTPS)**: [https://api.bunny777.me](https://api.bunny777.me)
+- **Live Backend AWS EC2 (Direct)**: [http://3.26.78.240](http://3.26.78.240)
 - **GitHub Repository**: [https://github.com/Bunny-777/Car-Mechanic](https://github.com/Bunny-777/Car-Mechanic)
 
 ---
@@ -16,21 +18,29 @@ A full-stack automotive diagnostic platform where vehicle owners troubleshoot me
 
 The system is built as a decoupled full-stack application:
 
-- **Frontend**: Next.js (React) + TypeScript + Vanilla CSS design system. Designed for high performance, mobile responsiveness, and deployed on Vercel.
-- **Backend**: Python + Django 5 + Django REST Framework (DRF) + SQLite. Provides RESTful endpoints for chat sessions, file uploads, diagnostic synthesis, and appointment booking, deployed on Render with Gunicorn.
-- **AI Engine & Optimization**: Google Gemini 1.5/2.0 Flash used selectively, backed by a deterministic automotive rule-based diagnostic state machine.
+- **Frontend**: Next.js (React) + TypeScript + Vanilla CSS design system. High performance, mobile responsive, deployed on **Vercel** with custom domain `car-mechanic.bunny777.me`. Features real-time backend health check pulsing indicator.
+- **Backend**: Python + Django 5 + Django REST Framework (DRF) + SQLite. Provides RESTful endpoints for chat sessions, file uploads, diagnostic synthesis, and appointment booking. Hosted 24/7 on **AWS EC2 (Ubuntu Free Tier)** with **Gunicorn** and **Nginx**.
+- **SSL / Edge Routing**: Secured via **Cloudflare** (`api.bunny777.me`), delivering free global edge HTTPS caching, DDoS mitigation, and SSL flexibility without mixed-content issues.
+- **AI Engine & Optimization**: Groq / Google Gemini Flash multimodal capabilities backed by deterministic automotive rule-based diagnostic state machine.
 
 ```
                       +-----------------------------+
                       |      Next.js Frontend       |
-                      |   (Vercel Production Live)  |
+                      | (https://car-mechanic.bunny777.me)
                       +--------------+--------------+
                                      |
-                             REST APIs (JSON)
+                             REST APIs (HTTPS)
                                      |
                       +--------------v--------------+
-                      |    Django REST Framework    |
-                      |   (Render Production Live)  |
+                      |    Cloudflare SSL Edge      |
+                      |   (https://api.bunny777.me) |
+                      +--------------+--------------+
+                                     |
+                             Nginx Reverse Proxy
+                                     |
+                      +--------------v--------------+
+                      |   AWS EC2 Django + Gunicorn |
+                      |       (http://3.26.78.240)  |
                       +--------------+--------------+
                                      |
              +-----------------------+-----------------------+
@@ -309,20 +319,29 @@ Open `http://localhost:3000` in your browser.
 
 ## Deployment Configuration
 
-### 1. Backend Deployment on Render (Free Tier)
-1. In Render, create a new **Web Service** connected to `Bunny-777/Car-Mechanic`.
-2. Configure settings:
-   - **Root Directory**: `backend`
-   - **Build Command**: `./build.sh`
-   - **Start Command**: `gunicorn mechanic_backend.wsgi:application`
-3. Environment variables:
-   - `GEMINI_API_KEY`: *(Your Google Gemini API key)*
-   - `DJANGO_SECRET_KEY`: `your-production-secret-key`
+### 1. Backend Deployment on AWS EC2 (Free Tier)
+1. **Launch Instance**: Ubuntu 24.04 LTS on `t2.micro` (Free Tier eligible).
+2. **Security Group**: Allow Inbound traffic on Port 22 (SSH), Port 80 (HTTP), and Port 443 (HTTPS).
+3. **App Setup**:
+   - Clone repo into `/home/ubuntu/Car-Mechanic`
+   - Create Python venv and install dependencies (`pip install -r requirements.txt`)
+   - Setup `.env` with production keys (`GROQ_API_KEY`, `GEMINI_API_KEY`, `DJANGO_SECRET_KEY`)
+   - Run migrations and static collection (`python manage.py migrate && python manage.py collectstatic`)
+4. **Service Automation**:
+   - **Gunicorn** runs as a `systemd` daemon listening on `127.0.0.1:8000`
+   - **Nginx** handles reverse proxying traffic from port 80 to Gunicorn, serving media and static files directly.
 
-### 2. Frontend Deployment on Vercel (Free Tier)
-1. In Vercel, import `Bunny-777/Car-Mechanic`.
+### 2. Edge SSL & DNS on Cloudflare
+1. **Domain**: `bunny777.me`
+2. **A Record**: `api.bunny777.me` pointing to AWS EC2 Public IP (`3.26.78.240`), with **Proxied (Orange Cloud)** enabled.
+3. **SSL/TLS Mode**: **Flexible**, providing free, automated HTTPS certificate management to prevent mixed-content blocks.
+
+### 3. Frontend Deployment on Vercel
+1. Import `Bunny-777/Car-Mechanic` into Vercel.
 2. Configure settings:
    - **Root Directory**: `frontend`
    - **Framework Preset**: Next.js
 3. Environment variables:
-   - `NEXT_PUBLIC_API_URL`: `https://car-mechanic.onrender.com`
+   - `NEXT_PUBLIC_API_URL`: `https://api.bunny777.me`
+4. Custom Domain:
+   - Attached `car-mechanic.bunny777.me` via CNAME pointing to `cname.vercel-dns.com` in Cloudflare (DNS only).
